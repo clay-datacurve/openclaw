@@ -187,9 +187,8 @@ export async function appendAssistantMessageToSessionTranscript(params: {
     return { ok: true, sessionFile };
   }
 
-  const sessionManager = SessionManager.open(sessionFile);
-  sessionManager.appendMessage({
-    role: "assistant",
+  const message = {
+    role: "assistant" as const,
     content: [{ type: "text", text: mirrorText }],
     api: "openai-responses",
     provider: "openclaw",
@@ -208,12 +207,14 @@ export async function appendAssistantMessageToSessionTranscript(params: {
         total: 0,
       },
     },
-    stopReason: "stop",
+    stopReason: "stop" as const,
     timestamp: Date.now(),
     ...(params.idempotencyKey ? { idempotencyKey: params.idempotencyKey } : {}),
-  });
+  } as Parameters<SessionManager["appendMessage"]>[0];
+  const sessionManager = SessionManager.open(sessionFile);
+  sessionManager.appendMessage(message);
 
-  emitSessionTranscriptUpdate(sessionFile);
+  emitSessionTranscriptUpdate({ sessionFile, sessionKey, message });
   return { ok: true, sessionFile };
 }
 
