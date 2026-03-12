@@ -256,13 +256,14 @@ describe("matrix monitor handler pairing account scope", () => {
 
   it("skips media downloads for unmentioned group media messages", async () => {
     const downloadContent = vi.fn(async () => Buffer.from("image"));
+    const getMemberDisplayName = vi.fn(async () => "sender");
     const { handler, resolveAgentRoute } = createMatrixHandlerTestHarness({
       client: {
         downloadContent,
       },
       isDirectMessage: false,
       mentionRegexes: [/@bot/i],
-      getMemberDisplayName: async () => "sender",
+      getMemberDisplayName,
     });
 
     await handler("!room:example.org", {
@@ -282,6 +283,7 @@ describe("matrix monitor handler pairing account scope", () => {
     } as MatrixRawEvent);
 
     expect(downloadContent).not.toHaveBeenCalled();
+    expect(getMemberDisplayName).not.toHaveBeenCalled();
     expect(resolveAgentRoute).not.toHaveBeenCalled();
   });
 
@@ -305,6 +307,7 @@ describe("matrix monitor handler pairing account scope", () => {
       nextBatch: null,
       prevBatch: null,
     }));
+    const getMemberDisplayName = vi.fn(async () => "sender");
     const { handler, resolveAgentRoute } = createMatrixHandlerTestHarness({
       client: {
         getEvent,
@@ -312,7 +315,7 @@ describe("matrix monitor handler pairing account scope", () => {
       },
       isDirectMessage: false,
       mentionRegexes: [/@bot/i],
-      getMemberDisplayName: async () => "sender",
+      getMemberDisplayName,
     });
 
     await handler("!room:example.org", {
@@ -333,6 +336,7 @@ describe("matrix monitor handler pairing account scope", () => {
 
     expect(getEvent).not.toHaveBeenCalled();
     expect(getRelations).not.toHaveBeenCalled();
+    expect(getMemberDisplayName).not.toHaveBeenCalled();
     expect(resolveAgentRoute).not.toHaveBeenCalled();
   });
 
