@@ -75,15 +75,20 @@ function resolveGatewaySessionTargetFromKey(key: string) {
 }
 
 function emitSessionsChanged(
-  broadcast: GatewayRequestContext["broadcast"],
+  context: Pick<GatewayRequestContext, "broadcastToConnIds" | "getSessionEventSubscriberConnIds">,
   payload: { sessionKey?: string; reason: string; compacted?: boolean },
 ) {
-  broadcast(
+  const connIds = context.getSessionEventSubscriberConnIds();
+  if (connIds.size === 0) {
+    return;
+  }
+  context.broadcastToConnIds(
     "sessions.changed",
     {
       ...payload,
       ts: Date.now(),
     },
+    connIds,
     { dropIfSlow: true },
   );
 }
@@ -127,10 +132,18 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     });
     respond(true, result, undefined);
   },
-  "sessions.subscribe": ({ respond }) => {
-    respond(true, { subscribed: true }, undefined);
+  "sessions.subscribe": ({ client, context, respond }) => {
+    const connId = client?.connId?.trim();
+    if (connId) {
+      context.subscribeSessionEvents(connId);
+    }
+    respond(true, { subscribed: Boolean(connId) }, undefined);
   },
-  "sessions.unsubscribe": ({ respond }) => {
+  "sessions.unsubscribe": ({ client, context, respond }) => {
+    const connId = client?.connId?.trim();
+    if (connId) {
+      context.unsubscribeSessionEvents(connId);
+    }
     respond(true, { subscribed: false }, undefined);
   },
   "sessions.preview": ({ params, respond }) => {
@@ -251,7 +264,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       },
     };
     respond(true, result, undefined);
-    emitSessionsChanged(context.broadcast, {
+    emitSessionsChanged(context, {
       sessionKey: target.canonicalKey,
       reason: "patch",
     });
@@ -277,7 +290,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       return;
     }
     respond(true, { ok: true, key: result.key, entry: result.entry }, undefined);
-    emitSessionsChanged(context.broadcast, {
+    emitSessionsChanged(context, {
       sessionKey: result.key,
       reason,
     });
@@ -353,7 +366,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
 
     respond(true, { ok: true, key: target.canonicalKey, deleted, archived }, undefined);
     if (deleted) {
-      emitSessionsChanged(context.broadcast, {
+      emitSessionsChanged(context, {
         sessionKey: target.canonicalKey,
         reason: "delete",
       });
@@ -482,7 +495,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       },
       undefined,
     );
-    emitSessionsChanged(context.broadcast, {
+    emitSessionsChanged(context, {
       sessionKey: target.canonicalKey,
       reason: "compact",
       compacted: true,
