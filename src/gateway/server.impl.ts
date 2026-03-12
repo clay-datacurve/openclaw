@@ -120,6 +120,7 @@ import { loadGatewayTlsRuntime } from "./server/tls.js";
 import { resolveSessionKeyForTranscriptFile } from "./session-transcript-key.js";
 import {
   attachOpenClawTranscriptMeta,
+  loadGatewaySessionRow,
   loadSessionEntry,
   readSessionMessages,
 } from "./session-utils.js";
@@ -838,6 +839,22 @@ export async function startGatewayServer(
         const messageSeq = entry?.sessionId
           ? readSessionMessages(entry.sessionId, storePath, entry.sessionFile).length
           : undefined;
+        const sessionRow = loadGatewaySessionRow(sessionKey);
+        const sessionSnapshot = sessionRow
+          ? {
+              session: sessionRow,
+              totalTokens: sessionRow.totalTokens,
+              totalTokensFresh: sessionRow.totalTokensFresh,
+              contextTokens: sessionRow.contextTokens,
+              estimatedCostUsd: sessionRow.estimatedCostUsd,
+              modelProvider: sessionRow.modelProvider,
+              model: sessionRow.model,
+              status: sessionRow.status,
+              startedAt: sessionRow.startedAt,
+              endedAt: sessionRow.endedAt,
+              runtimeMs: sessionRow.runtimeMs,
+            }
+          : {};
         const message = attachOpenClawTranscriptMeta(update.message, {
           ...(typeof update.messageId === "string" ? { id: update.messageId } : {}),
           ...(typeof messageSeq === "number" ? { seq: messageSeq } : {}),
@@ -849,10 +866,28 @@ export async function startGatewayServer(
             message,
             ...(typeof update.messageId === "string" ? { messageId: update.messageId } : {}),
             ...(typeof messageSeq === "number" ? { messageSeq } : {}),
+            ...sessionSnapshot,
           },
           connIds,
           { dropIfSlow: true },
         );
+
+        const sessionEventConnIds = sessionEventSubscribers.getAll();
+        if (sessionEventConnIds.size > 0) {
+          broadcastToConnIds(
+            "sessions.changed",
+            {
+              sessionKey,
+              phase: "message",
+              ts: Date.now(),
+              ...(typeof update.messageId === "string" ? { messageId: update.messageId } : {}),
+              ...(typeof messageSeq === "number" ? { messageSeq } : {}),
+              ...sessionSnapshot,
+            },
+            sessionEventConnIds,
+            { dropIfSlow: true },
+          );
+        }
       });
 
   let heartbeatRunner: HeartbeatRunner = minimalTestGateway
