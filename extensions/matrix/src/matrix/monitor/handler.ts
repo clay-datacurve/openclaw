@@ -225,10 +225,6 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         return;
       }
 
-      const roomInfo = await getRoomInfo(roomId);
-      const roomName = roomInfo.name;
-      const roomAliases = [roomInfo.canonicalAlias ?? "", ...roomInfo.altAliases].filter(Boolean);
-
       let content = event.content as RoomMessageEventContent;
 
       if (
@@ -260,16 +256,32 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         selfUserId,
       });
       const isRoom = !isDirectMessage;
+      let roomInfoPromise: Promise<{
+        name?: string;
+        canonicalAlias?: string;
+        altAliases: string[];
+      }> | null = null;
+      const getResolvedRoomInfo = async () => {
+        roomInfoPromise ??= getRoomInfo(roomId);
+        return await roomInfoPromise;
+      };
 
       if (isRoom && groupPolicy === "disabled") {
         return;
       }
 
+      const roomInfoForConfig =
+        isRoom && roomsConfig && Object.keys(roomsConfig).some((key) => key.trim().startsWith("#"))
+          ? await getResolvedRoomInfo()
+          : undefined;
+      const roomAliasesForConfig = roomInfoForConfig
+        ? [roomInfoForConfig.canonicalAlias ?? "", ...roomInfoForConfig.altAliases].filter(Boolean)
+        : [];
       const roomConfigInfo = isRoom
         ? resolveMatrixRoomConfig({
             rooms: roomsConfig,
             roomId,
-            aliases: roomAliases,
+            aliases: roomAliasesForConfig,
           })
         : undefined;
       const roomConfig = roomConfigInfo?.config;
@@ -548,6 +560,8 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         return;
       }
       const senderName = await getSenderName();
+      const roomInfo = isRoom ? await getResolvedRoomInfo() : undefined;
+      const roomName = roomInfo?.name;
 
       const messageId = event.event_id ?? "";
       const replyToEventId = content["m.relates_to"]?.["m.in_reply_to"]?.event_id;
@@ -622,7 +636,7 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         SenderId: senderId,
         SenderUsername: senderId.split(":")[0]?.replace(/^@/, ""),
         GroupSubject: isRoom ? (roomName ?? roomId) : undefined,
-        GroupChannel: isRoom ? (roomInfo.canonicalAlias ?? roomId) : undefined,
+        GroupChannel: isRoom ? roomId : undefined,
         GroupSystemPrompt: isRoom ? groupSystemPrompt : undefined,
         Provider: "matrix" as const,
         Surface: "matrix" as const,
