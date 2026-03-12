@@ -6,6 +6,7 @@ import type { ReplyToMode } from "../../config/types.js";
 import { normalizeTargetForProvider } from "../../infra/outbound/target-normalization.js";
 import { hasReplyChannelData, hasReplyContent } from "../../interactive/payload.js";
 import { normalizeOptionalAccountId } from "../../routing/account-id.js";
+import { stripReasoningTagsFromText } from "../../shared/text/reasoning-tags.js";
 import type { OriginatingChannelType } from "../templating.js";
 import type { ReplyPayload } from "../types.js";
 import { extractReplyToTag } from "./reply-tags.js";
@@ -86,7 +87,18 @@ export function isRenderablePayload(payload: ReplyPayload): boolean {
 }
 
 export function shouldSuppressReasoningPayload(payload: ReplyPayload): boolean {
-  return payload.isReasoning === true;
+  if (payload.isReasoning === true) {
+    return true;
+  }
+  const text = payload.text;
+  if (typeof text !== "string") {
+    return false;
+  }
+  if (text.trimStart().toLowerCase().startsWith("reasoning:")) {
+    return true;
+  }
+  const stripped = stripReasoningTagsFromText(text, { mode: "strict", trim: "both" });
+  return !stripped && stripped !== text;
 }
 
 export function applyReplyThreading(params: {

@@ -3,6 +3,7 @@ import { setActivePluginRegistry } from "../../plugins/runtime.js";
 import { createTestRegistry } from "../../test-utils/channel-plugins.js";
 import {
   filterMessagingToolMediaDuplicates,
+  shouldSuppressReasoningPayload,
   shouldSuppressMessagingToolReplies,
 } from "./reply-payloads.js";
 
@@ -168,5 +169,29 @@ describe("shouldSuppressMessagingToolReplies", () => {
         ],
       }),
     ).toBe(true);
+  });
+});
+
+describe("shouldSuppressReasoningPayload", () => {
+  it("suppresses raw reasoning-prefix text even when isReasoning is absent", () => {
+    expect(shouldSuppressReasoningPayload({ text: "  Reasoning:\n_hidden_" })).toBe(true);
+  });
+
+  it("suppresses thinking-tag-only text even when isReasoning is absent", () => {
+    expect(shouldSuppressReasoningPayload({ text: "<think>hidden</think>" })).toBe(true);
+  });
+
+  it("does not suppress text that merely mentions reasoning mid-message", () => {
+    expect(
+      shouldSuppressReasoningPayload({
+        text: "Intro line\nReasoning: appears in content but is not a prefix",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not suppress messages that contain an answer outside thinking tags", () => {
+    expect(shouldSuppressReasoningPayload({ text: "<think>hidden</think>Visible answer" })).toBe(
+      false,
+    );
   });
 });
