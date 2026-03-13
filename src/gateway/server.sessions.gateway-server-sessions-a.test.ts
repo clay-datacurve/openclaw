@@ -314,6 +314,32 @@ describe("gateway server sessions", () => {
     ws.close();
   });
 
+  test("sessions.create accepts an explicit key for persistent dashboard sessions", async () => {
+    await createSessionStoreDir();
+    const { ws } = await openClient();
+
+    const key = "agent:ops-agent:dashboard:direct:subagent-orchestrator";
+    const created = await rpcReq<{
+      key?: string;
+      sessionId?: string;
+      entry?: {
+        label?: string;
+      };
+    }>(ws, "sessions.create", {
+      key,
+      label: "Dashboard Orchestrator",
+    });
+
+    expect(created.ok).toBe(true);
+    expect(created.payload?.key).toBe(key);
+    expect(created.payload?.entry?.label).toBe("Dashboard Orchestrator");
+    expect(created.payload?.sessionId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+
+    ws.close();
+  });
+
   test("sessions.create rejects unknown parentSessionKey", async () => {
     await createSessionStoreDir();
     const { ws } = await openClient();

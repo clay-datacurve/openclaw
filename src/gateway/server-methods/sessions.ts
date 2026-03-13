@@ -12,7 +12,11 @@ import {
   type SessionEntry,
   updateSessionStore,
 } from "../../config/sessions.js";
-import { normalizeAgentId, parseAgentSessionKey } from "../../routing/session-key.js";
+import {
+  normalizeAgentId,
+  parseAgentSessionKey,
+  resolveAgentIdFromSessionKey,
+} from "../../routing/session-key.js";
 import { GATEWAY_CLIENT_IDS } from "../protocol/client-info.js";
 import {
   ErrorCodes,
@@ -127,6 +131,21 @@ function emitSessionsChanged(
       ts: Date.now(),
       ...(sessionRow
         ? {
+            updatedAt: sessionRow.updatedAt ?? undefined,
+            sessionId: sessionRow.sessionId,
+            kind: sessionRow.kind,
+            channel: sessionRow.channel,
+            label: sessionRow.label,
+            displayName: sessionRow.displayName,
+            deliveryContext: sessionRow.deliveryContext,
+            parentSessionKey: sessionRow.parentSessionKey,
+            childSessions: sessionRow.childSessions,
+            thinkingLevel: sessionRow.thinkingLevel,
+            systemSent: sessionRow.systemSent,
+            abortedLastRun: sessionRow.abortedLastRun,
+            lastChannel: sessionRow.lastChannel,
+            lastTo: sessionRow.lastTo,
+            lastAccountId: sessionRow.lastAccountId,
             totalTokens: sessionRow.totalTokens,
             totalTokensFresh: sessionRow.totalTokensFresh,
             contextTokens: sessionRow.contextTokens,
@@ -416,9 +435,29 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     }
     const p = params;
     const cfg = loadConfig();
+    const requestedKey = typeof p.key === "string" && p.key.trim() ? p.key.trim() : undefined;
     const agentId = normalizeAgentId(
       typeof p.agentId === "string" && p.agentId.trim() ? p.agentId : resolveDefaultAgentId(cfg),
     );
+    if (requestedKey) {
+      const requestedAgentId = parseAgentSessionKey(requestedKey)?.agentId;
+      if (
+        requestedAgentId &&
+        requestedAgentId !== agentId &&
+        typeof p.agentId === "string" &&
+        p.agentId.trim()
+      ) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            `sessions.create key agent (${requestedAgentId}) does not match agentId (${agentId})`,
+          ),
+        );
+        return;
+      }
+    }
     const parentSessionKey =
       typeof p.parentSessionKey === "string" && p.parentSessionKey.trim()
         ? p.parentSessionKey.trim()
@@ -436,8 +475,9 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       }
       canonicalParentSessionKey = parent.canonicalKey;
     }
-    const key = buildDashboardSessionKey(agentId);
+    const key = requestedKey ?? buildDashboardSessionKey(agentId);
     const target = resolveGatewaySessionStoreTarget({ cfg, key });
+    const targetAgentId = resolveAgentIdFromSessionKey(target.canonicalKey);
     const created = await updateSessionStore(target.storePath, async (store) => {
       const patched = await applySessionsPatchToStore({
         cfg,
@@ -471,7 +511,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       sessionId: created.entry.sessionId,
       storePath: target.storePath,
       sessionFile: created.entry.sessionFile,
-      agentId,
+      agentId: targetAgentId,
     });
     if (!ensured.ok) {
       await updateSessionStore(target.storePath, (store) => {

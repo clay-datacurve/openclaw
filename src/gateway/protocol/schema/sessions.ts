@@ -49,6 +49,7 @@ export const SessionsResolveParamsSchema = Type.Object(
 
 export const SessionsCreateParamsSchema = Type.Object(
   {
+    key: Type.Optional(NonEmptyString),
     agentId: Type.Optional(NonEmptyString),
     label: Type.Optional(SessionLabelString),
     model: Type.Optional(NonEmptyString),
