@@ -3,10 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "./subagent-registry.mocks.shared.js";
-import { captureEnv } from "../test-utils/env.js";
+import { captureEnv, withEnv } from "../test-utils/env.js";
 import {
   addSubagentRunForTests,
   clearSubagentRunSteerRestart,
+  getSubagentRunByChildSessionKey,
   initSubagentRegistry,
   listSubagentRunsForRequester,
   registerSubagentRun,
@@ -479,6 +480,52 @@ describe("subagent registry persistence", () => {
     };
     expect(after.runs?.["run-orphan-restore"]).toBeUndefined();
     expect(listSubagentRunsForRequester("agent:main:main")).toHaveLength(0);
+  });
+
+  it("prefers active runs and can resolve them from persisted registry snapshots", async () => {
+    const childSessionKey = "agent:main:subagent:disk-active";
+    await writePersistedRegistry(
+      {
+        version: 2,
+        runs: {
+          "run-complete": {
+            runId: "run-complete",
+            childSessionKey,
+            requesterSessionKey: "agent:main:main",
+            requesterDisplayKey: "main",
+            task: "completed first",
+            cleanup: "keep",
+            createdAt: 200,
+            startedAt: 210,
+            endedAt: 220,
+            outcome: { status: "ok" },
+          },
+          "run-active": {
+            runId: "run-active",
+            childSessionKey,
+            requesterSessionKey: "agent:main:main",
+            requesterDisplayKey: "main",
+            task: "still running",
+            cleanup: "keep",
+            createdAt: 100,
+            startedAt: 110,
+          },
+        },
+      },
+      { seedChildSessions: false },
+    );
+
+    resetSubagentRegistryForTests({ persist: false });
+
+    const resolved = withEnv({ VITEST: undefined, NODE_ENV: "development" }, () =>
+      getSubagentRunByChildSessionKey(childSessionKey),
+    );
+
+    expect(resolved).toMatchObject({
+      runId: "run-active",
+      childSessionKey,
+    });
+    expect(resolved?.endedAt).toBeUndefined();
   });
 
   it("resume guard prunes orphan runs before announce retry", async () => {

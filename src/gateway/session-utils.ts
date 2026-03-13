@@ -1054,6 +1054,10 @@ export function buildGatewaySessionRow(params: {
   const parsedAgent = parseAgentSessionKey(key);
   const sessionAgentId = normalizeAgentId(parsedAgent?.agentId ?? resolveDefaultAgentId(cfg));
   const subagentRun = getSubagentRunByChildSessionKey(key);
+  const subagentStatus = subagentRun ? resolveSubagentSessionStatus(subagentRun) : undefined;
+  const subagentStartedAt = subagentRun ? getSubagentSessionStartedAt(subagentRun) : undefined;
+  const subagentEndedAt = subagentRun ? subagentRun.endedAt : undefined;
+  const subagentRuntimeMs = subagentRun ? resolveSessionRuntimeMs(subagentRun, now) : undefined;
   const resolvedModel = resolveSessionModelIdentityRef(
     cfg,
     entry,
@@ -1151,10 +1155,10 @@ export function buildGatewaySessionRow(params: {
     totalTokens,
     totalTokensFresh,
     estimatedCostUsd,
-    status: resolveSubagentSessionStatus(subagentRun) ?? entry?.status,
-    startedAt: getSubagentSessionStartedAt(subagentRun) ?? entry?.startedAt,
-    endedAt: subagentRun?.endedAt ?? entry?.endedAt,
-    runtimeMs: resolveSessionRuntimeMs(subagentRun, now) ?? entry?.runtimeMs,
+    status: subagentRun ? subagentStatus : entry?.status,
+    startedAt: subagentRun ? subagentStartedAt : entry?.startedAt,
+    endedAt: subagentRun ? subagentEndedAt : entry?.endedAt,
+    runtimeMs: subagentRun ? subagentRuntimeMs : entry?.runtimeMs,
     parentSessionKey: entry?.parentSessionKey,
     childSessions,
     responseUsage: entry?.responseUsage,

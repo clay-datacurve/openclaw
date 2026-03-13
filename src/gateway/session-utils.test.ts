@@ -10,6 +10,7 @@ import { clearConfigCache, writeConfigFile } from "../config/config.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { SessionEntry } from "../config/sessions.js";
 import { withStateDirEnv } from "../test-helpers/state-dir-env.js";
+import { withEnv } from "../test-utils/env.js";
 import {
   capArrayByJsonBytes,
   classifySessionKey,
@@ -1314,6 +1315,74 @@ describe("listSessionsFromStore subagent metadata", () => {
     expect(followup?.status).toBe("running");
     expect(followup?.startedAt).toBe(now - 150_000);
     expect(followup?.runtimeMs).toBeGreaterThanOrEqual(150_000);
+  });
+
+  test("uses persisted active subagent runs when the local worker only has terminal snapshots", async () => {
+    await withStateDirEnv("openclaw-session-utils-subagent-", async ({ stateDir }) => {
+      const now = Date.now();
+      const childSessionKey = "agent:main:subagent:disk-live";
+      const registryPath = path.join(stateDir, "subagents", "runs.json");
+      fs.mkdirSync(path.dirname(registryPath), { recursive: true });
+      fs.writeFileSync(
+        registryPath,
+        JSON.stringify(
+          {
+            version: 2,
+            runs: {
+              "run-complete": {
+                runId: "run-complete",
+                childSessionKey,
+                requesterSessionKey: "agent:main:main",
+                requesterDisplayKey: "main",
+                task: "finished too early",
+                cleanup: "keep",
+                createdAt: now - 2_000,
+                startedAt: now - 1_900,
+                endedAt: now - 1_800,
+                outcome: { status: "ok" },
+              },
+              "run-live": {
+                runId: "run-live",
+                childSessionKey,
+                requesterSessionKey: "agent:main:main",
+                requesterDisplayKey: "main",
+                task: "still running",
+                cleanup: "keep",
+                createdAt: now - 10_000,
+                startedAt: now - 9_000,
+              },
+            },
+          },
+          null,
+          2,
+        ),
+        "utf-8",
+      );
+
+      const row = withEnv({ VITEST: undefined, NODE_ENV: "development" }, () => {
+        const result = listSessionsFromStore({
+          cfg,
+          storePath: "/tmp/sessions.json",
+          store: {
+            [childSessionKey]: {
+              sessionId: "sess-disk-live",
+              updatedAt: now,
+              spawnedBy: "agent:main:main",
+              status: "done",
+              endedAt: now - 1_800,
+              runtimeMs: 100,
+            } as SessionEntry,
+          },
+          opts: {},
+        });
+        return result.sessions.find((session) => session.key === childSessionKey);
+      });
+
+      expect(row?.status).toBe("running");
+      expect(row?.startedAt).toBe(now - 9_000);
+      expect(row?.endedAt).toBeUndefined();
+      expect(row?.runtimeMs).toBeGreaterThanOrEqual(9_000);
+    });
   });
 
   test("includes explicit parentSessionKey relationships for dashboard child sessions", () => {
