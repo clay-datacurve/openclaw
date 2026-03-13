@@ -719,6 +719,17 @@ export function createAgentEventHandler({
       if (recipients && recipients.size > 0) {
         broadcastToConnIds("agent", toolPayload, recipients);
       }
+      // Session subscribers power operator UIs that attach to an existing
+      // in-flight session after the run has already started. Those clients do
+      // not know the runId in advance, so they cannot register as run-scoped
+      // tool recipients. Mirror tool lifecycle onto a session-scoped event so
+      // they can render live pending tool cards without polling history.
+      if (sessionKey) {
+        const sessionSubscribers = sessionEventSubscribers.getAll();
+        if (sessionSubscribers.size > 0) {
+          broadcastToConnIds("session.tool", toolPayload, sessionSubscribers, { dropIfSlow: true });
+        }
+      }
     } else {
       broadcast("agent", agentPayload);
     }

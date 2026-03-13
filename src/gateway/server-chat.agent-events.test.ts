@@ -70,6 +70,7 @@ describe("agent event handler", () => {
       agentRunSeq,
       chatRunState,
       toolEventRecipients,
+      sessionEventSubscribers,
       handler,
     };
   }
@@ -583,6 +584,48 @@ describe("agent event handler", () => {
     // But node/channel subscribers should NOT receive when verbose is off
     const nodeToolCalls = nodeSendToSession.mock.calls.filter(([, event]) => event === "agent");
     expect(nodeToolCalls).toHaveLength(0);
+    resetAgentRunContextForTest();
+  });
+
+  it("mirrors tool events to session subscribers so late-joining operator UIs can render them", () => {
+    const { broadcastToConnIds, sessionEventSubscribers, handler } = createHarness({
+      resolveSessionKeyForRun: () => "session-1",
+    });
+
+    registerAgentRunContext("run-session-tool", { sessionKey: "session-1", verboseLevel: "off" });
+    sessionEventSubscribers.subscribe("conn-session");
+
+    handler({
+      runId: "run-session-tool",
+      seq: 1,
+      stream: "tool",
+      ts: 1_234,
+      data: {
+        phase: "start",
+        name: "exec",
+        toolCallId: "tool-session-1",
+        args: { command: "echo hi" },
+      },
+    });
+
+    expect(broadcastToConnIds).toHaveBeenCalledTimes(1);
+    expect(broadcastToConnIds).toHaveBeenCalledWith(
+      "session.tool",
+      expect.objectContaining({
+        runId: "run-session-tool",
+        sessionKey: "session-1",
+        stream: "tool",
+        ts: 1_234,
+        data: expect.objectContaining({
+          phase: "start",
+          name: "exec",
+          toolCallId: "tool-session-1",
+          args: { command: "echo hi" },
+        }),
+      }),
+      new Set(["conn-session"]),
+      { dropIfSlow: true },
+    );
     resetAgentRunContextForTest();
   });
 
