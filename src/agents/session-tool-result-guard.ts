@@ -71,6 +71,8 @@ function normalizePersistedToolResultName(
 export function installSessionToolResultGuard(
   sessionManager: SessionManager,
   opts?: {
+    /** Optional session key for transcript update broadcasts. */
+    sessionKey?: string;
     /**
      * Optional transform applied to any message before persistence.
      */
@@ -247,6 +249,7 @@ export function installSessionToolResultGuard(
     if (sessionFile) {
       emitSessionTranscriptUpdate({
         sessionFile,
+        sessionKey: opts?.sessionKey,
         message: finalMessage,
         messageId: typeof result === "string" ? result : undefined,
       });
