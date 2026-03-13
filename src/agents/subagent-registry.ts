@@ -706,7 +706,10 @@ function restoreSubagentRunsOnce() {
 function resolveArchiveAfterMs(cfg?: ReturnType<typeof loadConfig>) {
   const config = cfg ?? loadConfig();
   const minutes = config.agents?.defaults?.subagents?.archiveAfterMinutes ?? 60;
-  if (!Number.isFinite(minutes) || minutes <= 0) {
+  if (!Number.isFinite(minutes) || minutes < 0) {
+    return undefined;
+  }
+  if (minutes === 0) {
     return undefined;
   }
   return Math.max(1, Math.floor(minutes)) * 60_000;
@@ -1130,7 +1133,11 @@ export function replaceSubagentRunAfterSteer(params: {
   const archiveAfterMs = resolveArchiveAfterMs(cfg);
   const spawnMode = source.spawnMode === "session" ? "session" : "run";
   const archiveAtMs =
-    spawnMode === "session" ? undefined : archiveAfterMs ? now + archiveAfterMs : undefined;
+    spawnMode === "session" || source.cleanup === "keep"
+      ? undefined
+      : archiveAfterMs
+        ? now + archiveAfterMs
+        : undefined;
   const runTimeoutSeconds = params.runTimeoutSeconds ?? source.runTimeoutSeconds ?? 0;
   const waitTimeoutMs = resolveSubagentWaitTimeoutMs(cfg, runTimeoutSeconds);
   const preserveFrozenResultFallback = params.preserveFrozenResultFallback === true;
@@ -1194,7 +1201,11 @@ export function registerSubagentRun(params: {
   const archiveAfterMs = resolveArchiveAfterMs(cfg);
   const spawnMode = params.spawnMode === "session" ? "session" : "run";
   const archiveAtMs =
-    spawnMode === "session" ? undefined : archiveAfterMs ? now + archiveAfterMs : undefined;
+    spawnMode === "session" || params.cleanup === "keep"
+      ? undefined
+      : archiveAfterMs
+        ? now + archiveAfterMs
+        : undefined;
   const runTimeoutSeconds = params.runTimeoutSeconds ?? 0;
   const waitTimeoutMs = resolveSubagentWaitTimeoutMs(cfg, runTimeoutSeconds);
   const requesterOrigin = normalizeDeliveryContext(params.requesterOrigin);
