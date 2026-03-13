@@ -60,6 +60,7 @@ export type SessionListRow = {
   model?: string;
   contextTokens?: number | null;
   totalTokens?: number | null;
+  estimatedCostUsd?: number;
   status?: SessionRunStatus;
   startedAt?: number;
   endedAt?: number;
