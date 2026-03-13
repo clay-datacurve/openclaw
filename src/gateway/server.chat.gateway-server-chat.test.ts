@@ -235,6 +235,40 @@ describe("gateway server chat", () => {
     }
   });
 
+  test("sessions.steer forwards dashboard messages into existing sessions", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-sessions-steer-"));
+    testState.sessionStorePath = path.join(dir, "sessions.json");
+    try {
+      await writeSessionStore({
+        entries: {
+          "agent:main:dashboard:test-steer": {
+            sessionId: "sess-dashboard-steer",
+            updatedAt: Date.now(),
+          },
+        },
+      });
+
+      const spy = vi.mocked(getReplyFromConfig);
+      const callsBefore = spy.mock.calls.length;
+      const res = await rpcReq(ws, "sessions.steer", {
+        key: "agent:main:dashboard:test-steer",
+        message: "follow-up from dashboard",
+        idempotencyKey: "idem-sessions-steer-1",
+      });
+      expect(res.ok).toBe(true);
+      expect(res.payload?.runId).toBe("idem-sessions-steer-1");
+      expect(res.payload?.messageSeq).toBe(1);
+
+      await waitFor(() => spy.mock.calls.length > callsBefore, 1_000);
+      const ctx = spy.mock.calls.at(-1)?.[0] as { Body?: string; SessionKey?: string } | undefined;
+      expect(ctx?.Body).toContain("follow-up from dashboard");
+      expect(ctx?.SessionKey).toBe("agent:main:dashboard:test-steer");
+    } finally {
+      testState.sessionStorePath = undefined;
+      await fs.rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test("sessions.abort stops active dashboard runs", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-sessions-abort-"));
     testState.sessionStorePath = path.join(dir, "sessions.json");
