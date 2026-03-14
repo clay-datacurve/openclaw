@@ -216,6 +216,49 @@ describe("MatrixClient request hardening", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("prefers authenticated client media downloads", async () => {
+    const payload = Buffer.from([1, 2, 3, 4]);
+    const fetchMock = vi.fn(async () => new Response(payload, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const client = new MatrixClient("https://matrix.example.org", "token");
+    await expect(client.downloadContent("mxc://example.org/media")).resolves.toEqual(payload);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const firstUrl = String(fetchMock.mock.calls[0]?.[0]);
+    expect(firstUrl).toContain("/_matrix/client/v1/media/download/example.org/media");
+  });
+
+  it("falls back to legacy media downloads for older homeservers", async () => {
+    const payload = Buffer.from([5, 6, 7, 8]);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/_matrix/client/v1/media/download/")) {
+        return new Response(
+          JSON.stringify({
+            errcode: "M_UNRECOGNIZED",
+            error: "Unrecognized request",
+          }),
+          {
+            status: 404,
+            headers: { "content-type": "application/json" },
+          },
+        );
+      }
+      return new Response(payload, { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const client = new MatrixClient("https://matrix.example.org", "token");
+    await expect(client.downloadContent("mxc://example.org/media")).resolves.toEqual(payload);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstUrl = String(fetchMock.mock.calls[0]?.[0]);
+    const secondUrl = String(fetchMock.mock.calls[1]?.[0]);
+    expect(firstUrl).toContain("/_matrix/client/v1/media/download/example.org/media");
+    expect(secondUrl).toContain("/_matrix/media/v3/download/example.org/media");
+  });
+
   it("decrypts encrypted room events returned by getEvent", async () => {
     const client = new MatrixClient("https://matrix.example.org", "token");
     matrixJsClient.fetchRoomEvent = vi.fn(async () => ({

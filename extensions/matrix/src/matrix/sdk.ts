@@ -152,6 +152,20 @@ function isMatrixNotFoundError(err: unknown): boolean {
   );
 }
 
+function isUnsupportedAuthenticatedMediaEndpointError(err: unknown): boolean {
+  const statusCode = (err as { statusCode?: number })?.statusCode;
+  if (statusCode === 404 || statusCode === 405 || statusCode === 501) {
+    return true;
+  }
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    message.includes("m_unrecognized") ||
+    message.includes("unrecognized request") ||
+    message.includes("method not allowed") ||
+    message.includes("not implemented")
+  );
+}
+
 export class MatrixClient {
   private readonly client: MatrixJsClient;
   private readonly emitter = new EventEmitter();
@@ -625,16 +639,29 @@ export class MatrixClient {
     if (!parsed) {
       throw new Error(`Invalid Matrix content URI: ${mxcUrl}`);
     }
-    const endpoint = `/_matrix/media/v3/download/${encodeURIComponent(parsed.server)}/${encodeURIComponent(parsed.mediaId)}`;
-    const response = await this.httpClient.requestRaw({
-      method: "GET",
-      endpoint,
-      qs: { allow_remote: opts.allowRemote ?? true },
-      timeoutMs: this.localTimeoutMs,
-      maxBytes: opts.maxBytes,
-      readIdleTimeoutMs: opts.readIdleTimeoutMs,
-    });
-    return response;
+    const encodedServer = encodeURIComponent(parsed.server);
+    const encodedMediaId = encodeURIComponent(parsed.mediaId);
+    const request = async (endpoint: string): Promise<Buffer> =>
+      await this.httpClient.requestRaw({
+        method: "GET",
+        endpoint,
+        qs: { allow_remote: opts.allowRemote ?? true },
+        timeoutMs: this.localTimeoutMs,
+        maxBytes: opts.maxBytes,
+        readIdleTimeoutMs: opts.readIdleTimeoutMs,
+      });
+
+    const authenticatedEndpoint = `/_matrix/client/v1/media/download/${encodedServer}/${encodedMediaId}`;
+    try {
+      return await request(authenticatedEndpoint);
+    } catch (err) {
+      if (!isUnsupportedAuthenticatedMediaEndpointError(err)) {
+        throw err;
+      }
+    }
+
+    const legacyEndpoint = `/_matrix/media/v3/download/${encodedServer}/${encodedMediaId}`;
+    return await request(legacyEndpoint);
   }
 
   async uploadContent(file: Buffer, contentType?: string, filename?: string): Promise<string> {
