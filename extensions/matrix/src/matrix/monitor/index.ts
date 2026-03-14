@@ -181,6 +181,9 @@ export async function monitorMatrixProvider(opts: MonitorMatrixOpts = {}): Promi
   const mediaMaxBytes = Math.max(1, mediaMaxMb) * 1024 * 1024;
   const startupMs = Date.now();
   const startupGraceMs = 0;
+  // Cold starts should ignore old room history, but once we have a persisted
+  // /sync cursor we want restart backlogs to replay just like other channels.
+  const dropPreStartupMessages = !client.hasPersistedSyncState();
   const directTracker = createDirectRoomTracker(client, { log: logVerboseMessage });
   registerMatrixAutoJoin({ client, accountConfig, runtime });
   const warnedEncryptedRooms = new Set<string>();
@@ -208,6 +211,7 @@ export async function monitorMatrixProvider(opts: MonitorMatrixOpts = {}): Promi
     mediaMaxBytes,
     startupMs,
     startupGraceMs,
+    dropPreStartupMessages,
     directTracker,
     getRoomInfo,
     getMemberDisplayName,

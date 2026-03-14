@@ -11,6 +11,7 @@ import {
 import { VerificationMethod } from "matrix-js-sdk/lib/types.js";
 import { KeyedAsyncQueue } from "openclaw/plugin-sdk/keyed-async-queue";
 import { resolveMatrixRoomKeyBackupReadinessError } from "./backup-health.js";
+import { FileBackedMatrixSyncStore } from "./client/file-sync-store.js";
 import { createMatrixJsSdkClientLogger } from "./client/logging.js";
 import { MatrixCryptoBootstrapper } from "./sdk/crypto-bootstrap.js";
 import type { MatrixCryptoBootstrapResult } from "./sdk/crypto-bootstrap.js";
@@ -174,6 +175,7 @@ export class MatrixClient {
   private readonly initialSyncLimit?: number;
   private readonly encryptionEnabled: boolean;
   private readonly password?: string;
+  private readonly syncStore?: FileBackedMatrixSyncStore;
   private readonly idbSnapshotPath?: string;
   private readonly cryptoDatabasePrefix?: string;
   private bridgeRegistered = false;
@@ -211,6 +213,7 @@ export class MatrixClient {
       localTimeoutMs?: number;
       encryption?: boolean;
       initialSyncLimit?: number;
+      storagePath?: string;
       recoveryKeyPath?: string;
       idbSnapshotPath?: string;
       cryptoDatabasePrefix?: string;
@@ -222,6 +225,7 @@ export class MatrixClient {
     this.initialSyncLimit = opts.initialSyncLimit;
     this.encryptionEnabled = opts.encryption === true;
     this.password = opts.password;
+    this.syncStore = opts.storagePath ? new FileBackedMatrixSyncStore(opts.storagePath) : undefined;
     this.idbSnapshotPath = opts.idbSnapshotPath;
     this.cryptoDatabasePrefix = opts.cryptoDatabasePrefix;
     this.selfUserId = opts.userId?.trim() || null;
@@ -237,6 +241,7 @@ export class MatrixClient {
       deviceId: opts.deviceId,
       logger: createMatrixJsSdkClientLogger("MatrixClient"),
       localTimeoutMs: this.localTimeoutMs,
+      store: this.syncStore,
       cryptoCallbacks: cryptoCallbacks as never,
       verificationMethods: [
         VerificationMethod.Sas,
@@ -343,6 +348,10 @@ export class MatrixClient {
     }
   }
 
+  hasPersistedSyncState(): boolean {
+    return this.syncStore?.hasSavedSync() === true;
+  }
+
   private async ensureStartedForCryptoControlPlane(): Promise<void> {
     if (this.started) {
       return;
@@ -357,10 +366,13 @@ export class MatrixClient {
     }
     this.decryptBridge.stop();
     // Final persist on shutdown
-    this.stopPersistPromise = persistIdbToDisk({
-      snapshotPath: this.idbSnapshotPath,
-      databasePrefix: this.cryptoDatabasePrefix,
-    }).catch(noop);
+    this.stopPersistPromise = Promise.all([
+      persistIdbToDisk({
+        snapshotPath: this.idbSnapshotPath,
+        databasePrefix: this.cryptoDatabasePrefix,
+      }).catch(noop),
+      this.syncStore?.flush().catch(noop),
+    ]).then(() => undefined);
     this.client.stopClient();
     this.started = false;
   }

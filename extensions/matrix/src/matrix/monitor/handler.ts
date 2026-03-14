@@ -68,6 +68,7 @@ export type MatrixMonitorHandlerParams = {
   mediaMaxBytes: number;
   startupMs: number;
   startupGraceMs: number;
+  dropPreStartupMessages: boolean;
   directTracker: {
     isDirectMessage: (params: {
       roomId: string;
@@ -146,6 +147,7 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
     mediaMaxBytes,
     startupMs,
     startupGraceMs,
+    dropPreStartupMessages,
     directTracker,
     getRoomInfo,
     getMemberDisplayName,
@@ -239,15 +241,17 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
       }
       const eventTs = event.origin_server_ts;
       const eventAge = event.unsigned?.age;
-      if (typeof eventTs === "number" && eventTs < startupMs - startupGraceMs) {
-        return;
-      }
-      if (
-        typeof eventTs !== "number" &&
-        typeof eventAge === "number" &&
-        eventAge > startupGraceMs
-      ) {
-        return;
+      if (dropPreStartupMessages) {
+        if (typeof eventTs === "number" && eventTs < startupMs - startupGraceMs) {
+          return;
+        }
+        if (
+          typeof eventTs !== "number" &&
+          typeof eventAge === "number" &&
+          eventAge > startupGraceMs
+        ) {
+          return;
+        }
       }
 
       let content = event.content as RoomMessageEventContent;

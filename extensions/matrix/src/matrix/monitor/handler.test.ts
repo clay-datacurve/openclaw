@@ -736,4 +736,62 @@ describe("matrix monitor handler pairing account scope", () => {
 
     expect(enqueueSystemEvent).not.toHaveBeenCalled();
   });
+
+  it("drops pre-startup dm messages on cold start", async () => {
+    const resolveAgentRoute = vi.fn(() => ({
+      agentId: "ops",
+      channel: "matrix",
+      accountId: "ops",
+      sessionKey: "agent:ops:main",
+      mainSessionKey: "agent:ops:main",
+      matchedBy: "binding.account" as const,
+    }));
+    const { handler } = createMatrixHandlerTestHarness({
+      resolveAgentRoute,
+      isDirectMessage: true,
+      startupMs: 1_000,
+      startupGraceMs: 0,
+      dropPreStartupMessages: true,
+    });
+
+    await handler(
+      "!room:example.org",
+      createMatrixTextMessageEvent({
+        eventId: "$old-cold-start",
+        body: "hello",
+        originServerTs: 999,
+      }),
+    );
+
+    expect(resolveAgentRoute).not.toHaveBeenCalled();
+  });
+
+  it("replays pre-startup dm messages when persisted sync state exists", async () => {
+    const resolveAgentRoute = vi.fn(() => ({
+      agentId: "ops",
+      channel: "matrix",
+      accountId: "ops",
+      sessionKey: "agent:ops:main",
+      mainSessionKey: "agent:ops:main",
+      matchedBy: "binding.account" as const,
+    }));
+    const { handler } = createMatrixHandlerTestHarness({
+      resolveAgentRoute,
+      isDirectMessage: true,
+      startupMs: 1_000,
+      startupGraceMs: 0,
+      dropPreStartupMessages: false,
+    });
+
+    await handler(
+      "!room:example.org",
+      createMatrixTextMessageEvent({
+        eventId: "$old-resume",
+        body: "hello",
+        originServerTs: 999,
+      }),
+    );
+
+    expect(resolveAgentRoute).toHaveBeenCalledTimes(1);
+  });
 });

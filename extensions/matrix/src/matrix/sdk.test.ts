@@ -176,14 +176,18 @@ function createMatrixJsClientStub(): MatrixJsClientStub {
 let matrixJsClient = createMatrixJsClientStub();
 let lastCreateClientOpts: Record<string, unknown> | null = null;
 
-vi.mock("matrix-js-sdk", () => ({
-  ClientEvent: { Event: "event", Room: "Room" },
-  MatrixEventEvent: { Decrypted: "decrypted" },
-  createClient: vi.fn((opts: Record<string, unknown>) => {
-    lastCreateClientOpts = opts;
-    return matrixJsClient;
-  }),
-}));
+vi.mock("matrix-js-sdk", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("matrix-js-sdk")>();
+  return {
+    ...actual,
+    ClientEvent: { Event: "event", Room: "Room" },
+    MatrixEventEvent: { Decrypted: "decrypted" },
+    createClient: vi.fn((opts: Record<string, unknown>) => {
+      lastCreateClientOpts = opts;
+      return matrixJsClient;
+    }),
+  };
+});
 
 import { MatrixClient } from "./sdk.js";
 
@@ -484,6 +488,28 @@ describe("MatrixClient request hardening", () => {
     await vi.advanceTimersByTimeAsync(30);
 
     await assertion;
+  });
+
+  it("wires the sync store into the SDK and flushes it on shutdown", async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-matrix-sdk-store-"));
+    const storagePath = path.join(tempDir, "bot-storage.json");
+
+    try {
+      const client = new MatrixClient("https://matrix.example.org", "token", undefined, undefined, {
+        storagePath,
+      });
+
+      const store = lastCreateClientOpts?.store as { flush: () => Promise<void> } | undefined;
+      expect(store).toBeTruthy();
+      const flushSpy = vi.spyOn(store!, "flush").mockResolvedValue();
+
+      await client.stopAndPersist();
+
+      expect(flushSpy).toHaveBeenCalledTimes(1);
+      expect(matrixJsClient.stopClient).toHaveBeenCalledTimes(1);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
 

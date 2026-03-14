@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const hoisted = vi.hoisted(() => {
   const callOrder: string[] = [];
-  const client = { id: "matrix-client" };
+  const client = {
+    id: "matrix-client",
+    hasPersistedSyncState: vi.fn(() => false),
+  };
+  const createMatrixRoomMessageHandler = vi.fn(() => vi.fn());
   let startClientError: Error | null = null;
   const resolveTextChunkLimit = vi.fn<
     (cfg: unknown, channel: unknown, accountId?: unknown) => number
@@ -19,6 +23,7 @@ const hoisted = vi.hoisted(() => {
   return {
     callOrder,
     client,
+    createMatrixRoomMessageHandler,
     logger,
     resolveTextChunkLimit,
     setActiveMatrixClient,
@@ -176,7 +181,7 @@ vi.mock("./events.js", () => ({
 }));
 
 vi.mock("./handler.js", () => ({
-  createMatrixRoomMessageHandler: vi.fn(() => vi.fn()),
+  createMatrixRoomMessageHandler: hoisted.createMatrixRoomMessageHandler,
 }));
 
 vi.mock("./legacy-crypto-restore.js", () => ({
@@ -205,6 +210,8 @@ describe("monitorMatrixProvider", () => {
     hoisted.setActiveMatrixClient.mockReset();
     hoisted.stopSharedClientInstance.mockReset();
     hoisted.stopThreadBindingManager.mockReset();
+    hoisted.client.hasPersistedSyncState.mockReset().mockReturnValue(false);
+    hoisted.createMatrixRoomMessageHandler.mockReset().mockReturnValue(vi.fn());
     Object.values(hoisted.logger).forEach((mock) => mock.mockReset());
   });
 
@@ -248,5 +255,20 @@ describe("monitorMatrixProvider", () => {
     expect(hoisted.stopSharedClientInstance).toHaveBeenCalledTimes(1);
     expect(hoisted.setActiveMatrixClient).toHaveBeenNthCalledWith(1, hoisted.client, "default");
     expect(hoisted.setActiveMatrixClient).toHaveBeenNthCalledWith(2, null, "default");
+  });
+
+  it("disables cold-start backlog dropping when sync state already exists", async () => {
+    hoisted.client.hasPersistedSyncState.mockReturnValue(true);
+    const { monitorMatrixProvider } = await import("./index.js");
+    const abortController = new AbortController();
+    abortController.abort();
+
+    await monitorMatrixProvider({ abortSignal: abortController.signal });
+
+    expect(hoisted.createMatrixRoomMessageHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dropPreStartupMessages: false,
+      }),
+    );
   });
 });

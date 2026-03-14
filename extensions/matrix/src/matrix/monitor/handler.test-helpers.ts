@@ -34,6 +34,7 @@ type MatrixHandlerTestHarnessOptions = {
   mediaMaxBytes?: number;
   startupMs?: number;
   startupGraceMs?: number;
+  dropPreStartupMessages?: boolean;
   isDirectMessage?: boolean;
   readAllowFromStore?: MatrixMonitorHandlerParams["core"]["channel"]["pairing"]["readAllowFromStore"];
   upsertPairingRequest?: MatrixMonitorHandlerParams["core"]["channel"]["pairing"]["upsertPairingRequest"];
@@ -172,6 +173,7 @@ export function createMatrixHandlerTestHarness(
     mediaMaxBytes: options.mediaMaxBytes ?? 10_000_000,
     startupMs: options.startupMs ?? 0,
     startupGraceMs: options.startupGraceMs ?? 0,
+    dropPreStartupMessages: options.dropPreStartupMessages ?? true,
     directTracker: {
       isDirectMessage: async () => options.isDirectMessage ?? true,
     },
