@@ -103,6 +103,11 @@ export function resolveMatrixMigrationConfigFields(params: {
   const account = resolveMatrixAccountConfigEntry(params.cfg, params.accountId);
   const scopedEnv = resolveScopedMatrixEnvConfig(params.accountId, params.env);
   const globalEnv = resolveGlobalMatrixEnvConfig(params.env);
+  const normalizedAccountId = normalizeAccountId(params.accountId);
+  const userId =
+    clean(account?.userId) ||
+    scopedEnv.userId ||
+    (normalizedAccountId === DEFAULT_ACCOUNT_ID ? clean(channel?.userId) || globalEnv.userId : "");
 
   return {
     homeserver:
@@ -110,8 +115,7 @@ export function resolveMatrixMigrationConfigFields(params: {
       scopedEnv.homeserver ||
       clean(channel?.homeserver) ||
       globalEnv.homeserver,
-    userId:
-      clean(account?.userId) || scopedEnv.userId || clean(channel?.userId) || globalEnv.userId,
+    userId,
     accessToken:
       clean(account?.accessToken) ||
       scopedEnv.accessToken ||

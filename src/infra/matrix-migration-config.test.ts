@@ -137,6 +137,50 @@ describe("resolveMatrixMigrationAccountTarget", () => {
     });
   });
 
+  it("does not inherit the base userId for non-default token-only accounts", async () => {
+    await withTempHome(async (home) => {
+      const stateDir = path.join(home, ".openclaw");
+      writeFile(
+        path.join(stateDir, "credentials", "matrix", "credentials-ops.json"),
+        JSON.stringify(
+          {
+            homeserver: "https://matrix.example.org",
+            userId: "@ops-bot:example.org",
+            accessToken: "tok-ops",
+            deviceId: "DEVICE-OPS",
+          },
+          null,
+          2,
+        ),
+      );
+
+      const cfg: OpenClawConfig = {
+        channels: {
+          matrix: {
+            homeserver: "https://matrix.example.org",
+            userId: "@base-bot:example.org",
+            accounts: {
+              ops: {
+                homeserver: "https://matrix.example.org",
+                accessToken: "tok-ops",
+              },
+            },
+          },
+        },
+      };
+
+      const target = resolveMatrixMigrationAccountTarget({
+        cfg,
+        env: process.env,
+        accountId: "ops",
+      });
+
+      expect(target).not.toBeNull();
+      expect(target?.userId).toBe("@ops-bot:example.org");
+      expect(target?.storedDeviceId).toBe("DEVICE-OPS");
+    });
+  });
+
   it("uses the same scoped env token encoding as runtime account auth", async () => {
     await withTempHome(async () => {
       const cfg: OpenClawConfig = {
