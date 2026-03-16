@@ -3,7 +3,13 @@ import type { ChatType } from "../../channels/chat-type.js";
 import { getChannelPlugin } from "../../channels/plugins/index.js";
 import type { ChannelId } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
-import { recordSessionMetaFromInbound, resolveStorePath } from "../../config/sessions.js";
+import {
+  recordSessionMetaFromInbound,
+  resolveStorePath,
+  updateSessionStore,
+  mergeSessionEntry,
+  normalizeStoreSessionKey,
+} from "../../config/sessions.js";
 import { parseDiscordTarget, type DiscordTargetKind } from "../../discord/targets.js";
 import { parseIMessageTarget, normalizeIMessageHandle } from "../../imessage/targets.js";
 import { buildAgentSessionKey, type RoutePeer } from "../../routing/resolve-route.js";
@@ -982,11 +988,32 @@ export async function ensureOutboundSessionEntry(params: {
     OriginatingTo: params.route.to,
   };
   try {
-    await recordSessionMetaFromInbound({
+    const entry = await recordSessionMetaFromInbound({
       storePath,
       sessionKey: params.route.sessionKey,
       ctx,
     });
+    // If recordSessionMetaFromInbound returned null (e.g. patch was empty but no
+    // existing entry), fall back to creating a minimal session entry directly so
+    // that the subsequent transcript mirror append can find it.
+    if (!entry?.sessionId) {
+      await updateSessionStore(storePath, (store) => {
+        const key = normalizeStoreSessionKey(params.route.sessionKey);
+        if (store[key]?.sessionId) {
+          return null; // Already exists
+        }
+        store[key] = mergeSessionEntry(store[key], {
+          origin: {
+            provider: params.channel,
+            surface: params.channel,
+            chatType: params.route.chatType,
+            from: params.route.from,
+            to: params.route.to,
+          },
+        });
+        return null;
+      });
+    }
   } catch {
     // Do not block outbound sends on session meta writes.
   }
