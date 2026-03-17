@@ -758,7 +758,6 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
         });
       }
 
-      let didSendReply = false;
       const tableMode = core.channel.text.resolveMarkdownTableMode({
         cfg,
         channel: "matrix",
@@ -811,7 +810,6 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
               mediaLocalRoots,
               tableMode,
             });
-            didSendReply = true;
           },
           onError: (err: unknown, info: { kind: "tool" | "block" | "final" }) => {
             runtime.error?.(`matrix ${info.kind} reply failed: ${String(err)}`);
@@ -834,7 +832,6 @@ export function createMatrixRoomMessageHandler(params: MatrixMonitorHandlerParam
       if (!queuedFinal) {
         return;
       }
-      didSendReply = true;
       const finalCount = counts.final;
       logVerboseMessage(
         `matrix: delivered ${finalCount} reply${finalCount === 1 ? "" : "ies"} to ${replyTarget}`,

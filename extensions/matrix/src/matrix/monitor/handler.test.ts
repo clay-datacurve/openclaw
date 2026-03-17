@@ -234,6 +234,30 @@ describe("matrix monitor handler pairing account scope", () => {
     );
   });
 
+  it("does not enqueue delivered text messages into system events", async () => {
+    const dispatchReplyFromConfig = vi.fn(async () => ({
+      queuedFinal: true,
+      counts: { final: 1, block: 0, tool: 0 },
+    }));
+    const { handler, enqueueSystemEvent } = createMatrixHandlerTestHarness({
+      dispatchReplyFromConfig,
+      isDirectMessage: true,
+      getMemberDisplayName: async () => "sender",
+    });
+
+    await handler(
+      "!room:example.org",
+      createMatrixTextMessageEvent({
+        eventId: "$event-system-preview",
+        body: "hello from matrix",
+        mentions: { room: true },
+      }),
+    );
+
+    expect(dispatchReplyFromConfig).toHaveBeenCalled();
+    expect(enqueueSystemEvent).not.toHaveBeenCalled();
+  });
+
   it("drops forged metadata-only mentions before agent routing", async () => {
     const { handler, recordInboundSession, resolveAgentRoute } = createMatrixHandlerTestHarness({
       isDirectMessage: false,
