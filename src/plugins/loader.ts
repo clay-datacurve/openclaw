@@ -245,18 +245,7 @@ function resolvePluginRuntimeModulePath(params: LoaderModuleResolveParams = {}):
 
 const cachedPluginSdkExportedSubpaths = new Map<string, string[]>();
 
-function listPluginSdkExportedSubpaths(params: { modulePath?: string } = {}): string[] {
-  const modulePath = params.modulePath ?? fileURLToPath(import.meta.url);
-  const packageRoot = resolveOpenClawPackageRootSync({
-    cwd: path.dirname(modulePath),
-  });
-  if (!packageRoot) {
-    return [];
-  }
-  const cached = cachedPluginSdkExportedSubpaths.get(packageRoot);
-  if (cached) {
-    return cached;
-  }
+function readPluginSdkSubpathsFromPackageRoot(packageRoot: string): string[] | null {
   try {
     const pkgRaw = fs.readFileSync(path.join(packageRoot, "package.json"), "utf-8");
     const pkg = JSON.parse(pkgRaw) as {
@@ -267,11 +256,46 @@ function listPluginSdkExportedSubpaths(params: { modulePath?: string } = {}): st
       .map((key) => key.slice("./plugin-sdk/".length))
       .filter((subpath) => Boolean(subpath) && !subpath.includes("/"))
       .toSorted();
-    cachedPluginSdkExportedSubpaths.set(packageRoot, subpaths);
-    return subpaths;
+    return subpaths.length > 0 ? subpaths : null;
   } catch {
+    return null;
+  }
+}
+
+function findNearestPluginSdkPackageRoot(startDir: string, maxDepth = 12): string | null {
+  let cursor = path.resolve(startDir);
+  for (let i = 0; i < maxDepth; i += 1) {
+    const subpaths = readPluginSdkSubpathsFromPackageRoot(cursor);
+    if (subpaths) {
+      return cursor;
+    }
+    const parent = path.dirname(cursor);
+    if (parent === cursor) {
+      break;
+    }
+    cursor = parent;
+  }
+  return null;
+}
+
+function listPluginSdkExportedSubpaths(params: { modulePath?: string } = {}): string[] {
+  const modulePath = params.modulePath ?? fileURLToPath(import.meta.url);
+  const packageRoot =
+    resolveOpenClawPackageRootSync({
+      cwd: path.dirname(modulePath),
+    }) ??
+    findNearestPluginSdkPackageRoot(path.dirname(modulePath)) ??
+    findNearestPluginSdkPackageRoot(process.cwd());
+  if (!packageRoot) {
     return [];
   }
+  const cached = cachedPluginSdkExportedSubpaths.get(packageRoot);
+  if (cached) {
+    return cached;
+  }
+  const subpaths = readPluginSdkSubpathsFromPackageRoot(packageRoot) ?? [];
+  cachedPluginSdkExportedSubpaths.set(packageRoot, subpaths);
+  return subpaths;
 }
 
 const resolvePluginSdkScopedAliasMap = (): Record<string, string> => {
