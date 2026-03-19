@@ -30,13 +30,18 @@ installConnectedControlUiServerSuite((started) => {
   port = started.port;
 });
 
-async function waitFor(condition: () => boolean, timeoutMs = 250) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (condition()) {
-      return;
+async function waitFor(condition: () => boolean, timeoutMs = 250, stepMs = 2) {
+  vi.useFakeTimers();
+  try {
+    for (let elapsed = 0; elapsed <= timeoutMs; elapsed += stepMs) {
+      if (condition()) {
+        return;
+      }
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(stepMs);
     }
-    await new Promise((r) => setTimeout(r, 2));
+  } finally {
+    vi.useRealTimers();
   }
   throw new Error("timeout waiting for condition");
 }
@@ -871,7 +876,14 @@ describe("gateway server chat", () => {
           timeoutMs: 1_000,
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        vi.useFakeTimers();
+        try {
+          const settle = new Promise((resolve) => setTimeout(resolve, 20));
+          await vi.advanceTimersByTimeAsync(20);
+          await settle;
+        } finally {
+          vi.useRealTimers();
+        }
         emitAgentEvent({
           runId,
           stream: "lifecycle",

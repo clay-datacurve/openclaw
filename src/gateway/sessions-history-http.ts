@@ -171,6 +171,16 @@ export async function handleSessionHistoryHttpRequest(
   const target = resolveGatewaySessionStoreTarget({ cfg, key: sessionKey });
   const store = loadSessionStore(target.storePath);
   const entry = target.storeKeys.map((key) => store[key]).find(Boolean);
+  if (!entry?.sessionId) {
+    sendJson(res, 404, {
+      ok: false,
+      error: {
+        type: "not_found",
+        message: `Session not found: ${sessionKey}`,
+      },
+    });
+    return true;
+  }
   const limit = resolveLimit(req);
   const cursor = resolveCursor(req);
   const history = paginateSessionMessages(

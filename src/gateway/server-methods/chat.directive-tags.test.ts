@@ -95,7 +95,26 @@ vi.mock("../../sessions/transcript-events.js", () => ({
 }));
 
 const { chatHandlers } = await import("./chat.js");
-const FAST_WAIT_OPTS = { timeout: 250, interval: 2 } as const;
+
+async function waitForAssertion(assertion: () => void, timeoutMs = 250, stepMs = 2) {
+  vi.useFakeTimers();
+  try {
+    let lastError: unknown;
+    for (let elapsed = 0; elapsed <= timeoutMs; elapsed += stepMs) {
+      try {
+        assertion();
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(stepMs);
+    }
+    throw lastError ?? new Error("assertion did not pass in time");
+  } finally {
+    vi.useRealTimers();
+  }
+}
 
 function createTranscriptFixture(prefix: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -212,19 +231,17 @@ async function runNonStreamingChatSend(params: {
     if (params.waitForCompletion === false) {
       return undefined;
     }
-    await vi.waitFor(() => {
+    await waitForAssertion(() => {
       expect(params.context.dedupe.has(`chat:${params.idempotencyKey}`)).toBe(true);
-    }, FAST_WAIT_OPTS);
+    });
     return undefined;
   }
 
-  await vi.waitFor(
-    () =>
-      expect(
-        (params.context.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls.length,
-      ).toBe(1),
-    FAST_WAIT_OPTS,
-  );
+  await waitForAssertion(() => {
+    expect(
+      (params.context.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls.length,
+    ).toBe(1);
+  });
 
   const chatCall = (params.context.broadcast as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
   expect(chatCall?.[0]).toBe("chat");

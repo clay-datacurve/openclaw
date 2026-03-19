@@ -1324,7 +1324,6 @@ export const chatHandlers: GatewayRequestHandlers = {
         channel: INTERNAL_MESSAGE_CHANNEL,
       });
       const deliveredReplies: Array<{ payload: ReplyPayload; kind: "block" | "final" }> = [];
-      const finalReplyParts: string[] = [];
       const userTranscriptMessage = {
         role: "user" as const,
         content: parsedMessage,

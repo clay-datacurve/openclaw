@@ -105,6 +105,26 @@ type AgentParams = AgentHandlerArgs["params"];
 type AgentIdentityGetHandlerArgs = Parameters<(typeof agentHandlers)["agent.identity.get"]>[0];
 type AgentIdentityGetParams = AgentIdentityGetHandlerArgs["params"];
 
+async function waitForAssertion(assertion: () => void, timeoutMs = 2_000, stepMs = 5) {
+  vi.useFakeTimers();
+  try {
+    let lastError: unknown;
+    for (let elapsed = 0; elapsed <= timeoutMs; elapsed += stepMs) {
+      try {
+        assertion();
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(stepMs);
+    }
+    throw lastError ?? new Error("assertion did not pass in time");
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 function mockMainSessionEntry(entry: Record<string, unknown>, cfg: Record<string, unknown> = {}) {
   mocks.loadSessionEntry.mockReturnValue({
     cfg,
@@ -166,7 +186,7 @@ function resetTimeConfig() {
 }
 
 async function expectResetCall(expectedMessage: string) {
-  await vi.waitFor(() => expect(mocks.agentCommand).toHaveBeenCalled());
+  await waitForAssertion(() => expect(mocks.agentCommand).toHaveBeenCalled());
   expect(mocks.performGatewaySessionReset).toHaveBeenCalledTimes(1);
   const call = readLastAgentCommandCall();
   expect(call?.message).toBe(expectedMessage);
@@ -542,7 +562,7 @@ describe("gateway agent handler", () => {
     );
 
     // Wait for the async agentCommand call
-    await vi.waitFor(() => expect(mocks.agentCommand).toHaveBeenCalled());
+    await waitForAssertion(() => expect(mocks.agentCommand).toHaveBeenCalled());
 
     const callArgs = mocks.agentCommand.mock.calls[0][0];
     expect(callArgs.message).toBe("[Wed 2026-01-28 20:30 EST] Is it the weekend?");
@@ -583,7 +603,7 @@ describe("gateway agent handler", () => {
       },
     );
 
-    await vi.waitFor(() => expect(mocks.agentCommand).toHaveBeenCalled());
+    await waitForAssertion(() => expect(mocks.agentCommand).toHaveBeenCalled());
     const callArgs = mocks.agentCommand.mock.calls.at(-1)?.[0] as
       | { senderIsOwner?: boolean }
       | undefined;
@@ -608,7 +628,7 @@ describe("gateway agent handler", () => {
       { reqId: "strict-1" },
     );
 
-    await vi.waitFor(() => expect(mocks.agentCommand).toHaveBeenCalled());
+    await waitForAssertion(() => expect(mocks.agentCommand).toHaveBeenCalled());
     const callArgs = mocks.agentCommand.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(callArgs.bestEffortDeliver).toBe(false);
   });
@@ -664,7 +684,7 @@ describe("gateway agent handler", () => {
       },
       { reqId: "workspace-forwarded-1" },
     );
-    await vi.waitFor(() => expect(mocks.agentCommand).toHaveBeenCalled());
+    await waitForAssertion(() => expect(mocks.agentCommand).toHaveBeenCalled());
     const spawnedCall = mocks.agentCommand.mock.calls.at(-1)?.[0] as { workspaceDir?: string };
     expect(spawnedCall.workspaceDir).toBe("/tmp/inherited");
   });
@@ -706,7 +726,7 @@ describe("gateway agent handler", () => {
       },
     );
 
-    await vi.waitFor(() => expect(mocks.agentCommand).toHaveBeenCalled());
+    await waitForAssertion(() => expect(mocks.agentCommand).toHaveBeenCalled());
     const callArgs = mocks.agentCommand.mock.calls.at(-1)?.[0] as {
       channel?: string;
       messageChannel?: string;
@@ -786,7 +806,7 @@ describe("gateway agent handler", () => {
       { reqId: "4" },
     );
 
-    await vi.waitFor(() => expect(mocks.agentCommand).toHaveBeenCalled());
+    await waitForAssertion(() => expect(mocks.agentCommand).toHaveBeenCalled());
     expect(mocks.performGatewaySessionReset).toHaveBeenCalledTimes(1);
     const call = readLastAgentCommandCall();
     // Message is now dynamically built with current date — check key substrings

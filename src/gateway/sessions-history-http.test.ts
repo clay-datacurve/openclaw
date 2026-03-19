@@ -119,6 +119,31 @@ describe("session history HTTP endpoints", () => {
     }
   });
 
+  test("returns 404 for unknown sessions", async () => {
+    await createSessionStoreFile();
+
+    const harness = await createGatewaySuiteHarness();
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:${harness.port}/sessions/${encodeURIComponent("agent:main:missing")}/history`,
+        {
+          headers: AUTH_HEADER,
+        },
+      );
+
+      expect(res.status).toBe(404);
+      await expect(res.json()).resolves.toMatchObject({
+        ok: false,
+        error: {
+          type: "not_found",
+          message: "Session not found: agent:main:missing",
+        },
+      });
+    } finally {
+      await harness.close();
+    }
+  });
+
   test("supports cursor pagination over direct REST while preserving the messages field", async () => {
     const { storePath } = await seedSession({ text: "first message" });
     const second = await appendAssistantMessageToSessionTranscript({

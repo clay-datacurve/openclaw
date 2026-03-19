@@ -26,6 +26,7 @@ export function createGatewayCloseHandler(params: {
   agentUnsub: (() => void) | null;
   heartbeatUnsub: (() => void) | null;
   transcriptUnsub: (() => void) | null;
+  lifecycleUnsub: (() => void) | null;
   chatRunState: { clear: () => void };
   clients: Set<{ socket: { close: (code: number, reason: string) => void } }>;
   configReloader: { stop: () => Promise<void> };
@@ -111,6 +112,13 @@ export function createGatewayCloseHandler(params: {
       if (params.transcriptUnsub) {
         try {
           params.transcriptUnsub();
+        } catch {
+          /* ignore */
+        }
+      }
+      if (params.lifecycleUnsub) {
+        try {
+          params.lifecycleUnsub();
         } catch {
           /* ignore */
         }
