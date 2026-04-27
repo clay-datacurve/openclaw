@@ -1508,7 +1508,12 @@ export function listSessionsFromStore(params: {
       ? Math.max(1, Math.floor(opts.activeMinutes))
       : undefined;
 
-  let sessions = Object.entries(store)
+  const limit =
+    typeof opts.limit === "number" && Number.isFinite(opts.limit)
+      ? Math.max(1, Math.floor(opts.limit))
+      : undefined;
+
+  let sessionEntries = Object.entries(store)
     .filter(([key]) => {
       if (isCronRunSessionKey(key)) {
         return false;
@@ -1561,7 +1566,24 @@ export function listSessionsFromStore(params: {
         return true;
       }
       return entry?.label === label;
-    })
+    });
+
+  if (activeMinutes !== undefined) {
+    const cutoff = now - activeMinutes * 60_000;
+    sessionEntries = sessionEntries.filter(([, entry]) => (entry?.updatedAt ?? 0) >= cutoff);
+  }
+
+  if (!search) {
+    sessionEntries = sessionEntries.toSorted(
+      ([, a], [, b]) => (b?.updatedAt ?? 0) - (a?.updatedAt ?? 0),
+    );
+
+    if (limit !== undefined) {
+      sessionEntries = sessionEntries.slice(0, limit);
+    }
+  }
+
+  let sessions = sessionEntries
     .map(([key, entry]) =>
       buildGatewaySessionRow({
         cfg,
@@ -1585,13 +1607,7 @@ export function listSessionsFromStore(params: {
     });
   }
 
-  if (activeMinutes !== undefined) {
-    const cutoff = now - activeMinutes * 60_000;
-    sessions = sessions.filter((s) => (s.updatedAt ?? 0) >= cutoff);
-  }
-
-  if (typeof opts.limit === "number" && Number.isFinite(opts.limit)) {
-    const limit = Math.max(1, Math.floor(opts.limit));
+  if (search && limit !== undefined) {
     sessions = sessions.slice(0, limit);
   }
 
