@@ -51,6 +51,7 @@ export function listSlackMessageActions(
     actions.add("emoji-list");
   }
   if (isActionEnabled("canvases")) {
+    actions.add("canvas-read");
     actions.add("canvas-create");
     actions.add("canvas-edit");
     actions.add("canvas-section-lookup");

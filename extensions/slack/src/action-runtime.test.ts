@@ -17,6 +17,7 @@ const listSlackReactions = vi.fn(async (..._args: unknown[]) => ({}));
 const lookupSlackCanvasSections = vi.fn(async (..._args: unknown[]) => ({ sections: [] }));
 const pinSlackMessage = vi.fn(async (..._args: unknown[]) => ({}));
 const reactSlackMessage = vi.fn(async (..._args: unknown[]) => ({}));
+const readSlackCanvas = vi.fn(async (..._args: unknown[]) => ({ text: "Canvas body" }));
 const readSlackMessages = vi.fn(async (..._args: unknown[]) => ({}));
 const removeOwnSlackReactions = vi.fn(async (..._args: unknown[]) => ["thumbsup"]);
 const removeSlackReaction = vi.fn(async (..._args: unknown[]) => ({}));
@@ -111,6 +112,7 @@ describe("handleSlackAction", () => {
       parseSlackBlocksInput,
       pinSlackMessage,
       reactSlackMessage,
+      readSlackCanvas,
       readSlackMessages,
       recordSlackThreadParticipation,
       removeOwnSlackReactions,
@@ -753,6 +755,21 @@ describe("handleSlackAction", () => {
       },
     } as OpenClawConfig);
     expect(token).toBe("xoxp-user");
+  });
+
+  it("reads a canvas from a Slack docs URL", async () => {
+    await handleSlackAction(
+      {
+        action: "readCanvas",
+        canvasUrl: "https://datacurve.slack.com/docs/T06RJLSHDGE/F0A5UJZ1W3D",
+      },
+      slackConfig(),
+    );
+
+    expect(readSlackCanvas).toHaveBeenCalledWith(
+      "F0A5UJZ1W3D",
+      expect.objectContaining({ cfg: expect.any(Object) }),
+    );
   });
 
   it("creates a canvas with markdown content", async () => {

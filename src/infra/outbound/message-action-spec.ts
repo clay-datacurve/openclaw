@@ -42,6 +42,7 @@ export const MESSAGE_ACTION_TARGET_MODE: Record<ChannelMessageActionName, Messag
     "role-info": "none",
     "emoji-list": "none",
     "emoji-upload": "none",
+    "canvas-read": "none",
     "canvas-create": "none",
     "canvas-edit": "none",
     "canvas-section-lookup": "none",

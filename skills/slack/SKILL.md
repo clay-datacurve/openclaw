@@ -143,11 +143,20 @@ Disable Canvas actions with `channels.slack.actions.canvases: false` or per-acco
 
 ### Slack Canvases
 
-Slack's Web API supports Canvas create/edit, section lookup, and access settings. It does **not** currently expose a full Canvas body read/export method, so section lookup can find section IDs for targeted edits but cannot return the full document text.
+Slack Canvas support can read body text through Slack file metadata plus the private Canvas download URL. The Web API also supports Canvas create/edit, section lookup, and access settings.
 
-Required Slack scopes: `canvases:read` for section lookup, `canvases:write` for create/edit/access updates. The setup manifest includes both scopes for new installs. Existing Slack apps need the scopes added and the app reinstalled.
+Required Slack scopes: existing `files:read` access is enough for `canvas-read` when the bot can access the Canvas file. `canvases:read` is required for section lookup, and `canvases:write` is required for create/edit/access updates. The setup manifest includes the Canvas scopes for new installs. Existing Slack apps need the scopes added and the app reinstalled before section/write APIs work.
 
 `canvasId` may be a raw Canvas/file ID like `F1234ABCD` or a Slack docs/files URL such as `https://workspace.slack.com/docs/T123/F1234ABCD`.
+
+#### Canvas read
+
+```json
+{
+  "action": "canvas-read",
+  "canvasUrl": "https://workspace.slack.com/docs/T123/F1234ABCD"
+}
+```
 
 #### Canvas create
 
@@ -215,4 +224,5 @@ Use either `channelIds` or `userIds`, not both. `accessLevel` may be `read`, `wr
 
 - React with ✅ to mark completed tasks.
 - Pin key decisions or weekly status updates.
+- Use `canvas-read` when someone shares a Slack Canvas link.
 - Use `canvas-section-lookup` before targeted Canvas edits that need a section ID.

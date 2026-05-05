@@ -689,6 +689,14 @@
             "emojiName"
           ]
         },
+        "canvas-read": {
+          "label": "canvas read",
+          "detailKeys": [
+            "provider",
+            "canvasId",
+            "canvasUrl"
+          ]
+        },
         "canvas-create": {
           "label": "canvas create",
           "detailKeys": [

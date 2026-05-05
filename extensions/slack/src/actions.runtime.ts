@@ -10,6 +10,7 @@ export {
   listSlackPins,
   listSlackReactions,
   lookupSlackCanvasSections,
+  readSlackCanvas,
   pinSlackMessage,
   reactSlackMessage,
   readSlackMessages,

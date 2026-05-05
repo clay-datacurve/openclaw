@@ -197,6 +197,8 @@ export async function handleSlackMessageAction(params: {
       "sectionId",
       "titleContent",
       "criteria",
+      "includeHtml",
+      "maxBytes",
       "accessLevel",
       "channelId",
       "channelIds",
@@ -208,6 +210,8 @@ export async function handleSlackMessageAction(params: {
       }
     }
     switch (action) {
+      case "canvas-read":
+        return await invoke({ ...canvasPayload, action: "readCanvas" }, cfg);
       case "canvas-create":
         return await invoke({ ...canvasPayload, action: "createCanvas" }, cfg);
       case "canvas-edit":

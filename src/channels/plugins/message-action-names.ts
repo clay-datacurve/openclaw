@@ -31,6 +31,7 @@ export const CHANNEL_MESSAGE_ACTION_NAMES = [
   "role-info",
   "emoji-list",
   "emoji-upload",
+  "canvas-read",
   "canvas-create",
   "canvas-edit",
   "canvas-section-lookup",

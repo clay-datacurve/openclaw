@@ -467,14 +467,14 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
 - `typingReaction` adds a temporary reaction to the inbound Slack message while a reply is running, then removes it on completion. Use a Slack emoji shortcode such as `"hourglass_flowing_sand"`.
 - `channels.slack.execApprovals`: Slack-native exec approval delivery and approver authorization. Same schema as Discord: `enabled` (`true`/`false`/`"auto"`), `approvers` (Slack user IDs), `agentFilter`, `sessionFilter`, and `target` (`"dm"`, `"channel"`, or `"both"`).
 
-| Action group | Default | Notes                          |
-| ------------ | ------- | ------------------------------ |
-| reactions    | enabled | React + list reactions         |
-| messages     | enabled | Read/send/edit/delete          |
-| pins         | enabled | Pin/unpin/list                 |
-| memberInfo   | enabled | Member info                    |
-| emojiList    | enabled | Custom emoji list              |
-| canvases     | enabled | Canvas create/edit/access APIs |
+| Action group | Default | Notes                               |
+| ------------ | ------- | ----------------------------------- |
+| reactions    | enabled | React + list reactions              |
+| messages     | enabled | Read/send/edit/delete               |
+| pins         | enabled | Pin/unpin/list                      |
+| memberInfo   | enabled | Member info                         |
+| emojiList    | enabled | Custom emoji list                   |
+| canvases     | enabled | Canvas read/create/edit/access APIs |
 
 ### Mattermost
 

@@ -2,10 +2,13 @@ import type { WebClient } from "@slack/web-api";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-runtime";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+const fetchWithSlackAuth = vi.fn();
 const resolveSlackMedia = vi.fn();
 const createSlackWebClientMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./monitor/media.js", () => ({
+  fetchWithSlackAuth: (...args: Parameters<typeof fetchWithSlackAuth>) =>
+    fetchWithSlackAuth(...args),
   resolveSlackMedia: (...args: Parameters<typeof resolveSlackMedia>) => resolveSlackMedia(...args),
 }));
 

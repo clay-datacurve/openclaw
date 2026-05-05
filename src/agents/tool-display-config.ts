@@ -446,6 +446,10 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
           label: "emoji upload",
           detailKeys: ["provider", "guildId", "emojiName"],
         },
+        "canvas-read": {
+          label: "canvas read",
+          detailKeys: ["provider", "canvasId", "canvasUrl"],
+        },
         "canvas-create": {
           label: "canvas create",
           detailKeys: ["provider", "canvasId", "canvasUrl", "title", "channelId"],

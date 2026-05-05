@@ -5,7 +5,7 @@ import { resolveSlackAccount } from "./accounts.js";
 import { buildSlackBlocksFallbackText } from "./blocks-fallback.js";
 import { validateSlackBlocksArray } from "./blocks-input.js";
 import { createSlackWebClient, getSlackWriteClient } from "./client.js";
-import { resolveSlackMedia } from "./monitor/media.js";
+import { fetchWithSlackAuth, resolveSlackMedia } from "./monitor/media.js";
 import type { SlackMediaResult } from "./monitor/media.js";
 import { sendMessageSlack } from "./send.js";
 import { resolveSlackBotToken } from "./token.js";
@@ -51,6 +51,15 @@ export type SlackCanvasDocumentContent =
 
 export type SlackCanvasChange = Record<string, unknown>;
 export type SlackCanvasAccessLevel = "read" | "write" | "owner";
+
+export type SlackCanvasReadResult = {
+  canvasId: string;
+  title?: string;
+  filetype?: string;
+  mimetype?: string;
+  text: string;
+  html?: string;
+};
 
 type SlackCanvasClient = WebClient & {
   canvases: {
@@ -410,6 +419,8 @@ export async function deleteSlackCanvasAccess(
 type SlackFileInfoSummary = {
   id?: string;
   name?: string;
+  title?: string;
+  filetype?: string;
   mimetype?: string;
   url_private?: string;
   url_private_download?: string;
@@ -418,6 +429,79 @@ type SlackFileInfoSummary = {
   ims?: unknown;
   shares?: unknown;
 };
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
+    .replace(/&#(\d+);/g, (_match, dec: string) => String.fromCodePoint(Number.parseInt(dec, 10)));
+}
+
+function htmlToReadableText(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<\s*(script|style)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+      .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+      .replace(/<\s*\/\s*(p|div|li|h[1-6]|tr|blockquote|pre)\s*>/gi, "\n")
+      .replace(/<\s*li\b[^>]*>/gi, "\n- ")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((line) => line.replace(/[ \t]+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n"),
+  );
+}
+
+function assertSlackCanvasFile(file: SlackFileInfoSummary | undefined, canvasId: string) {
+  if (!file) {
+    throw new Error(`Slack Canvas ${canvasId} was not found.`);
+  }
+  const filetype = file.filetype?.trim().toLowerCase();
+  const mimetype = file.mimetype?.trim().toLowerCase();
+  if (filetype && filetype !== "quip" && mimetype !== "application/vnd.slack-docs") {
+    throw new Error(`Slack file ${canvasId} is ${file.filetype ?? file.mimetype}, not a Canvas.`);
+  }
+}
+
+export async function readSlackCanvas(
+  canvasId: string,
+  opts: SlackActionClientOpts & { includeHtml?: boolean; maxBytes?: number } = {},
+): Promise<SlackCanvasReadResult> {
+  const token = resolveToken(opts.token, opts.accountId, opts.cfg);
+  const client = await getClient(opts);
+  const info = await client.files.info({ file: canvasId });
+  const file = info.file as SlackFileInfoSummary | undefined;
+  assertSlackCanvasFile(file, canvasId);
+  const url = file?.url_private_download ?? file?.url_private;
+  if (!url) {
+    throw new Error(`Slack Canvas ${canvasId} has no private download URL.`);
+  }
+  const response = await fetchWithSlackAuth(url, token);
+  if (!response.ok) {
+    throw new Error(`Slack Canvas ${canvasId} fetch failed with HTTP ${response.status}.`);
+  }
+  const html = await response.text();
+  const maxBytes = opts.maxBytes ?? 2_000_000;
+  if (Buffer.byteLength(html, "utf-8") > maxBytes) {
+    throw new Error(`Slack Canvas ${canvasId} exceeded maxBytes (${maxBytes}).`);
+  }
+  return {
+    canvasId: file?.id ?? canvasId,
+    ...(file?.title || file?.name ? { title: file.title ?? file.name } : {}),
+    ...(file?.filetype ? { filetype: file.filetype } : {}),
+    ...(file?.mimetype ? { mimetype: file.mimetype } : {}),
+    text: htmlToReadableText(html),
+    ...(opts.includeHtml ? { html } : {}),
+  };
+}
 
 type SlackFileThreadShare = {
   channelId: string;

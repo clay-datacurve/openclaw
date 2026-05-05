@@ -22,6 +22,7 @@ const slackDefaultActions = [
   "list-pins",
   "member-info",
   "emoji-list",
+  "canvas-read",
   "canvas-create",
   "canvas-edit",
   "canvas-section-lookup",

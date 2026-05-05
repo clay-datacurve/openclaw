@@ -26,6 +26,7 @@ const messagingActions = new Set([
 const reactionsActions = new Set(["react", "reactions"]);
 const pinActions = new Set(["pinMessage", "unpinMessage", "listPins"]);
 const canvasActions = new Set([
+  "readCanvas",
   "createCanvas",
   "editCanvas",
   "lookupCanvasSections",
@@ -71,6 +72,7 @@ export const slackActionRuntime = {
   listSlackPins: createLazySlackAction("listSlackPins"),
   listSlackReactions: createLazySlackAction("listSlackReactions"),
   lookupSlackCanvasSections: createLazySlackAction("lookupSlackCanvasSections"),
+  readSlackCanvas: createLazySlackAction("readSlackCanvas"),
   parseSlackBlocksInput,
   pinSlackMessage: createLazySlackAction("pinSlackMessage"),
   reactSlackMessage: createLazySlackAction("reactSlackMessage"),
@@ -615,6 +617,21 @@ export async function handleSlackAction(
       throw new Error("Slack canvases are disabled.");
     }
     switch (action) {
+      case "readCanvas": {
+        const canvasId = resolveCanvasIdParam(params);
+        const includeHtml = params.includeHtml === true;
+        const rawMaxBytes = params.maxBytes;
+        const maxBytes =
+          typeof rawMaxBytes === "number" && Number.isFinite(rawMaxBytes) && rawMaxBytes > 0
+            ? rawMaxBytes
+            : undefined;
+        const result = await slackActionRuntime.readSlackCanvas(canvasId, {
+          ...readOpts,
+          includeHtml,
+          maxBytes,
+        });
+        return jsonResult({ ok: true, result });
+      }
       case "createCanvas": {
         const title = readStringParam(params, "title");
         const documentContent = readCanvasDocumentContent(params);

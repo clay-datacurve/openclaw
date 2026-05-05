@@ -73,6 +73,14 @@ export function createSlackCanvasToolSchemaProperties() {
         },
       ),
     ),
+    includeHtml: Type.Optional(
+      Type.Boolean({
+        description: "For canvas-read, include raw Slack Canvas HTML alongside extracted text.",
+      }),
+    ),
+    maxBytes: Type.Optional(
+      Type.Number({ description: "For canvas-read, maximum private URL response size in bytes." }),
+    ),
     accessLevel: Type.Optional(
       Type.Union([Type.Literal("read"), Type.Literal("write"), Type.Literal("owner")], {
         description: "Canvas access level for canvases.access.set.",
