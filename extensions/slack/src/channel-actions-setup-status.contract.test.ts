@@ -22,6 +22,11 @@ const slackDefaultActions = [
   "list-pins",
   "member-info",
   "emoji-list",
+  "canvas-create",
+  "canvas-edit",
+  "canvas-section-lookup",
+  "canvas-access-set",
+  "canvas-access-delete",
 ] as const;
 
 describe("slack actions contract", () => {

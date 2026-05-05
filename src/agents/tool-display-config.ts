@@ -446,6 +446,26 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
           label: "emoji upload",
           detailKeys: ["provider", "guildId", "emojiName"],
         },
+        "canvas-create": {
+          label: "canvas create",
+          detailKeys: ["provider", "canvasId", "canvasUrl", "title", "channelId"],
+        },
+        "canvas-edit": {
+          label: "canvas edit",
+          detailKeys: ["provider", "canvasId", "canvasUrl", "operation", "sectionId"],
+        },
+        "canvas-section-lookup": {
+          label: "canvas sections",
+          detailKeys: ["provider", "canvasId", "canvasUrl"],
+        },
+        "canvas-access-set": {
+          label: "canvas access",
+          detailKeys: ["provider", "canvasId", "canvasUrl", "accessLevel"],
+        },
+        "canvas-access-delete": {
+          label: "canvas access delete",
+          detailKeys: ["provider", "canvasId", "canvasUrl"],
+        },
         "sticker-upload": {
           label: "sticker upload",
           detailKeys: ["provider", "guildId", "stickerName"],

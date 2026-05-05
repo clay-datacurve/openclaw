@@ -50,6 +50,13 @@ export function listSlackMessageActions(
   if (isActionEnabled("emojiList")) {
     actions.add("emoji-list");
   }
+  if (isActionEnabled("canvases")) {
+    actions.add("canvas-create");
+    actions.add("canvas-edit");
+    actions.add("canvas-section-lookup");
+    actions.add("canvas-access-set");
+    actions.add("canvas-access-delete");
+  }
   return Array.from(actions);
 }
 

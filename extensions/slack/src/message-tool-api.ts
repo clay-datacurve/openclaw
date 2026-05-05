@@ -1,6 +1,7 @@
 import type { ChannelMessageActionAdapter } from "openclaw/plugin-sdk/channel-contract";
 import { isSlackInteractiveRepliesEnabled } from "./interactive-replies.js";
 import { listSlackMessageActions } from "./message-actions.js";
+import { createSlackCanvasToolSchemaProperties } from "./message-tool-schema.js";
 
 export function describeSlackMessageTool({
   cfg,
@@ -14,8 +15,15 @@ export function describeSlackMessageTool({
   if (isSlackInteractiveRepliesEnabled({ cfg, accountId })) {
     capabilities.add("presentation");
   }
+  const canvasActions = actions.filter((action) => action.startsWith("canvas-"));
   return {
     actions,
     capabilities: Array.from(capabilities),
+    schema: canvasActions.length
+      ? {
+          actions: canvasActions,
+          properties: createSlackCanvasToolSchemaProperties(),
+        }
+      : null,
   };
 }

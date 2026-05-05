@@ -36,6 +36,8 @@ function buildSlackManifest(botName: string) {
         bot: [
           "app_mentions:read",
           "assistant:write",
+          "canvases:read",
+          "canvases:write",
           "channels:history",
           "channels:read",
           "chat:write",

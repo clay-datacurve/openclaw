@@ -110,7 +110,10 @@ describe("slackPlugin actions", () => {
 
     expect(discovery?.actions).toContain("send");
     expect(discovery?.capabilities).toEqual(expect.arrayContaining(["presentation"]));
-    expect(discovery?.schema).toBeUndefined();
+    expect(discovery?.schema).toMatchObject({
+      actions: expect.arrayContaining(["canvas-edit"]),
+      properties: expect.objectContaining({ canvasId: expect.any(Object) }),
+    });
   });
 
   it("honors the selected Slack account during message tool discovery", () => {
@@ -125,6 +128,7 @@ describe("slackPlugin actions", () => {
             pins: false,
             memberInfo: false,
             emojiList: false,
+            canvases: false,
           },
           capabilities: {
             interactiveReplies: false,
@@ -139,6 +143,7 @@ describe("slackPlugin actions", () => {
                 pins: false,
                 memberInfo: false,
                 emojiList: false,
+                canvases: false,
               },
               capabilities: {
                 interactiveReplies: false,
@@ -153,6 +158,7 @@ describe("slackPlugin actions", () => {
                 pins: false,
                 memberInfo: false,
                 emojiList: false,
+                canvases: false,
               },
               capabilities: {
                 interactiveReplies: true,
@@ -224,7 +230,7 @@ describe("slackPlugin actions", () => {
     );
   });
 
-  it("does not expose Slack-native message tool schema", () => {
+  it("exposes Slack Canvas message tool schema", () => {
     const discovery = slackPlugin.actions?.describeMessageTool({
       cfg: {
         channels: {
@@ -235,7 +241,10 @@ describe("slackPlugin actions", () => {
         },
       } as OpenClawConfig,
     });
-    expect(discovery?.schema).toBeUndefined();
+    expect(discovery?.schema).toMatchObject({
+      actions: expect.arrayContaining(["canvas-edit"]),
+      properties: expect.objectContaining({ canvasId: expect.any(Object) }),
+    });
   });
 
   it("treats interactive reply payloads as structured Slack payloads", () => {
@@ -276,6 +285,35 @@ describe("slackPlugin actions", () => {
         action: "readMessages",
         channelId: "C123",
         threadId: "1712345678.123456",
+      }),
+      {},
+      undefined,
+    );
+  });
+
+  it("forwards Slack Canvas message actions to the Slack action runtime", async () => {
+    handleSlackActionMock.mockResolvedValueOnce({ details: { ok: true } });
+    const handleAction = requireSlackHandleAction();
+
+    await handleAction({
+      action: "canvas-edit",
+      channel: "slack",
+      accountId: "default",
+      cfg: {},
+      params: {
+        canvasUrl: "https://datacurve.slack.com/docs/T06RJLSHDGE/F0A5UJZ1W3D",
+        operation: "insert_at_end",
+        markdown: "update",
+      },
+    });
+
+    expect(handleSlackActionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "editCanvas",
+        accountId: "default",
+        canvasUrl: "https://datacurve.slack.com/docs/T06RJLSHDGE/F0A5UJZ1W3D",
+        operation: "insert_at_end",
+        markdown: "update",
       }),
       {},
       undefined,

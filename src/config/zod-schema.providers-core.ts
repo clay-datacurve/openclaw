@@ -946,6 +946,7 @@ export const SlackAccountSchema = z
         memberInfo: z.boolean().optional(),
         channelInfo: z.boolean().optional(),
         emojiList: z.boolean().optional(),
+        canvases: z.boolean().optional(),
       })
       .strict()
       .optional(),

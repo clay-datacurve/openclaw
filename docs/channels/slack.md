@@ -147,6 +147,8 @@ Base manifest (Socket Mode default):
       "bot": [
         "app_mentions:read",
         "assistant:write",
+        "canvases:read",
+        "canvases:write",
         "channels:history",
         "channels:read",
         "chat:write",
@@ -435,8 +437,11 @@ Available action groups in current Slack tooling:
 | pins       | enabled |
 | memberInfo | enabled |
 | emojiList  | enabled |
+| canvases   | enabled |
 
-Current Slack message actions include `send`, `upload-file`, `download-file`, `read`, `edit`, `delete`, `pin`, `unpin`, `list-pins`, `member-info`, and `emoji-list`. `download-file` accepts Slack file IDs shown in inbound file placeholders and returns image previews for images or local file metadata for other file types.
+Current Slack message actions include `send`, `upload-file`, `download-file`, `read`, `edit`, `delete`, `pin`, `unpin`, `list-pins`, `member-info`, `emoji-list`, `canvas-create`, `canvas-edit`, `canvas-section-lookup`, `canvas-access-set`, and `canvas-access-delete`. `download-file` accepts Slack file IDs shown in inbound file placeholders and returns image previews for images or local file metadata for other file types.
+
+Slack Canvas support uses `canvases:read` for section lookup and `canvases:write` for create, edit, and access updates. Slack does not expose a full Canvas body read/export Web API, so OpenClaw can look up section IDs for targeted edits but cannot return the whole document text.
 
 ## Access control and routing
 

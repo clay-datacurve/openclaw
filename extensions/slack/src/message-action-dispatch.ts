@@ -184,6 +184,45 @@ export async function handleSlackMessageAction(params: {
     return await invoke({ action: "emojiList", limit, accountId }, cfg);
   }
 
+  if (action.startsWith("canvas-")) {
+    const canvasPayload: Record<string, unknown> = { accountId };
+    for (const key of [
+      "canvasId",
+      "canvasUrl",
+      "title",
+      "markdown",
+      "documentContent",
+      "changes",
+      "operation",
+      "sectionId",
+      "titleContent",
+      "criteria",
+      "accessLevel",
+      "channelId",
+      "channelIds",
+      "userId",
+      "userIds",
+    ]) {
+      if (actionParams[key] !== undefined) {
+        canvasPayload[key] = actionParams[key];
+      }
+    }
+    switch (action) {
+      case "canvas-create":
+        return await invoke({ ...canvasPayload, action: "createCanvas" }, cfg);
+      case "canvas-edit":
+        return await invoke({ ...canvasPayload, action: "editCanvas" }, cfg);
+      case "canvas-section-lookup":
+        return await invoke({ ...canvasPayload, action: "lookupCanvasSections" }, cfg);
+      case "canvas-access-set":
+        return await invoke({ ...canvasPayload, action: "setCanvasAccess" }, cfg);
+      case "canvas-access-delete":
+        return await invoke({ ...canvasPayload, action: "deleteCanvasAccess" }, cfg);
+      default:
+        break;
+    }
+  }
+
   if (action === "download-file") {
     const fileId = readStringParam(actionParams, "fileId", { required: true });
     const channelId =

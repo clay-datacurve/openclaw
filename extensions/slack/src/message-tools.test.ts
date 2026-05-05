@@ -16,7 +16,7 @@ describe("Slack message tools", () => {
         },
       }),
     ).toMatchObject({
-      actions: expect.arrayContaining(["send", "upload-file", "read"]),
+      actions: expect.arrayContaining(["send", "upload-file", "read", "canvas-edit"]),
       capabilities: expect.arrayContaining(["presentation"]),
     });
   });
@@ -72,6 +72,7 @@ describe("Slack message tools", () => {
             pins: false,
             memberInfo: false,
             emojiList: false,
+            canvases: false,
           },
           accounts: {
             default: {
@@ -82,6 +83,7 @@ describe("Slack message tools", () => {
                 pins: false,
                 memberInfo: false,
                 emojiList: false,
+                canvases: false,
               },
             },
             work: {
@@ -92,6 +94,7 @@ describe("Slack message tools", () => {
                 pins: false,
                 memberInfo: false,
                 emojiList: false,
+                canvases: false,
               },
             },
           },
@@ -110,5 +113,26 @@ describe("Slack message tools", () => {
       "download-file",
       "upload-file",
     ]);
+  });
+
+  it("contributes Slack Canvas schema when canvas actions are enabled", () => {
+    const described = describeSlackMessageTool({
+      cfg: {
+        channels: {
+          slack: {
+            botToken: "xoxb-test",
+          },
+        },
+      } as OpenClawConfig,
+    });
+
+    expect(described.actions).toEqual(expect.arrayContaining(["canvas-access-set"]));
+    expect(described.schema).toMatchObject({
+      actions: expect.arrayContaining(["canvas-edit"]),
+      properties: expect.objectContaining({
+        canvasId: expect.any(Object),
+        accessLevel: expect.any(Object),
+      }),
+    });
   });
 });

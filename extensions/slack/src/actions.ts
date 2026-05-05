@@ -42,6 +42,38 @@ export type SlackPin = {
   file?: { id?: string; name?: string };
 };
 
+export type SlackCanvasDocumentContent =
+  | {
+      type: "markdown";
+      markdown: string;
+    }
+  | Record<string, unknown>;
+
+export type SlackCanvasChange = Record<string, unknown>;
+export type SlackCanvasAccessLevel = "read" | "write" | "owner";
+
+type SlackCanvasClient = WebClient & {
+  canvases: {
+    create: (args: Record<string, unknown>) => Promise<unknown>;
+    edit: (args: Record<string, unknown>) => Promise<unknown>;
+    access: {
+      set: (args: Record<string, unknown>) => Promise<unknown>;
+      delete: (args: Record<string, unknown>) => Promise<unknown>;
+    };
+    sections: {
+      lookup: (args: Record<string, unknown>) => Promise<unknown>;
+    };
+  };
+};
+
+function getCanvasClient(client: WebClient): SlackCanvasClient {
+  const canvasClient = client as SlackCanvasClient;
+  if (!canvasClient.canvases) {
+    throw new Error("Installed @slack/web-api client does not expose Slack Canvas APIs.");
+  }
+  return canvasClient;
+}
+
 function resolveToken(explicit?: string, accountId?: string, cfg?: OpenClawConfig): string {
   if (explicit?.trim()) {
     const token = resolveSlackBotToken(explicit);
@@ -308,6 +340,71 @@ export async function listSlackPins(
   const client = await getClient(opts);
   const result = await client.pins.list({ channel: channelId });
   return (result.items ?? []) as SlackPin[];
+}
+
+export async function createSlackCanvas(
+  opts: SlackActionClientOpts & {
+    title?: string;
+    documentContent?: SlackCanvasDocumentContent;
+    channelId?: string;
+  } = {},
+): Promise<unknown> {
+  const client = getCanvasClient(await getClient(opts, "write"));
+  return await client.canvases.create({
+    ...(opts.title ? { title: opts.title } : {}),
+    ...(opts.documentContent ? { document_content: opts.documentContent } : {}),
+    ...(opts.channelId ? { channel_id: opts.channelId } : {}),
+  });
+}
+
+export async function editSlackCanvas(
+  canvasId: string,
+  changes: SlackCanvasChange[],
+  opts: SlackActionClientOpts = {},
+): Promise<unknown> {
+  const client = getCanvasClient(await getClient(opts, "write"));
+  return await client.canvases.edit({
+    canvas_id: canvasId,
+    changes,
+  });
+}
+
+export async function lookupSlackCanvasSections(
+  canvasId: string,
+  criteria: Record<string, unknown>,
+  opts: SlackActionClientOpts = {},
+): Promise<unknown> {
+  const client = getCanvasClient(await getClient(opts));
+  return await client.canvases.sections.lookup({
+    canvas_id: canvasId,
+    criteria,
+  });
+}
+
+export async function setSlackCanvasAccess(
+  canvasId: string,
+  accessLevel: SlackCanvasAccessLevel,
+  opts: SlackActionClientOpts & { channelIds?: string[]; userIds?: string[] } = {},
+): Promise<unknown> {
+  const client = getCanvasClient(await getClient(opts, "write"));
+  return await client.canvases.access.set({
+    canvas_id: canvasId,
+    access_level: accessLevel,
+    ...(opts.channelIds ? { channel_ids: opts.channelIds } : {}),
+    ...(opts.userIds ? { user_ids: opts.userIds } : {}),
+  });
+}
+
+export async function deleteSlackCanvasAccess(
+  canvasId: string,
+  opts: SlackActionClientOpts & { channelIds?: string[]; userIds?: string[] } = {},
+): Promise<unknown> {
+  const client = getCanvasClient(await getClient(opts, "write"));
+  return await client.canvases.access.delete({
+    canvas_id: canvasId,
+    ...(opts.channelIds ? { channel_ids: opts.channelIds } : {}),
+    ...(opts.userIds ? { user_ids: opts.userIds } : {}),
+  });
 }
 
 type SlackFileInfoSummary = {

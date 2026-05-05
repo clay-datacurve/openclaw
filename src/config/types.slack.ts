@@ -76,6 +76,7 @@ export type SlackActionConfig = {
   memberInfo?: boolean;
   channelInfo?: boolean;
   emojiList?: boolean;
+  canvases?: boolean;
 };
 
 export type SlackSlashCommandConfig = {

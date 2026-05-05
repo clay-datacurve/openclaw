@@ -25,6 +25,13 @@ const messagingActions = new Set([
 
 const reactionsActions = new Set(["react", "reactions"]);
 const pinActions = new Set(["pinMessage", "unpinMessage", "listPins"]);
+const canvasActions = new Set([
+  "createCanvas",
+  "editCanvas",
+  "lookupCanvasSections",
+  "setCanvasAccess",
+  "deleteCanvasAccess",
+]);
 
 type SlackActionsRuntimeModule = typeof import("./actions.runtime.js");
 type SlackAccountsRuntimeModule = typeof import("./accounts.runtime.js");
@@ -53,13 +60,17 @@ function createLazySlackAction<K extends keyof SlackActionsRuntimeModule>(
 }
 
 export const slackActionRuntime = {
+  createSlackCanvas: createLazySlackAction("createSlackCanvas"),
+  deleteSlackCanvasAccess: createLazySlackAction("deleteSlackCanvasAccess"),
   deleteSlackMessage: createLazySlackAction("deleteSlackMessage"),
   downloadSlackFile: createLazySlackAction("downloadSlackFile"),
+  editSlackCanvas: createLazySlackAction("editSlackCanvas"),
   editSlackMessage: createLazySlackAction("editSlackMessage"),
   getSlackMemberInfo: createLazySlackAction("getSlackMemberInfo"),
   listSlackEmojis: createLazySlackAction("listSlackEmojis"),
   listSlackPins: createLazySlackAction("listSlackPins"),
   listSlackReactions: createLazySlackAction("listSlackReactions"),
+  lookupSlackCanvasSections: createLazySlackAction("lookupSlackCanvasSections"),
   parseSlackBlocksInput,
   pinSlackMessage: createLazySlackAction("pinSlackMessage"),
   reactSlackMessage: createLazySlackAction("reactSlackMessage"),
@@ -68,6 +79,7 @@ export const slackActionRuntime = {
   removeOwnSlackReactions: createLazySlackAction("removeOwnSlackReactions"),
   removeSlackReaction: createLazySlackAction("removeSlackReaction"),
   sendSlackMessage: createLazySlackAction("sendSlackMessage"),
+  setSlackCanvasAccess: createLazySlackAction("setSlackCanvasAccess"),
   unpinSlackMessage: createLazySlackAction("unpinSlackMessage"),
 };
 
@@ -139,6 +151,134 @@ function readSlackBlocksParam(params: Record<string, unknown>) {
 
 function isImageContentType(value: string | undefined): boolean {
   return value?.trim().toLowerCase().startsWith("image/") === true;
+}
+
+function parseJsonParam(value: string, key: string): unknown {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${key} must be valid JSON: ${message}`, { cause: error });
+  }
+}
+
+function readRecordParam(
+  params: Record<string, unknown>,
+  key: string,
+  options: { required?: boolean } = {},
+): Record<string, unknown> | undefined {
+  const raw = params[key];
+  const value = typeof raw === "string" ? parseJsonParam(raw, key) : raw;
+  if (value == null) {
+    if (options.required) {
+      throw new Error(`${key} is required.`);
+    }
+    return undefined;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${key} must be an object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function readRecordArrayParam(
+  params: Record<string, unknown>,
+  key: string,
+  options: { required?: boolean } = {},
+): Record<string, unknown>[] | undefined {
+  const raw = params[key];
+  const value = typeof raw === "string" ? parseJsonParam(raw, key) : raw;
+  if (value == null) {
+    if (options.required) {
+      throw new Error(`${key} is required.`);
+    }
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${key} must be an array.`);
+  }
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`${key} entries must be objects.`);
+    }
+  }
+  return value as Record<string, unknown>[];
+}
+
+function readStringArrayParam(params: Record<string, unknown>, key: string): string[] | undefined {
+  const raw = params[key];
+  if (raw == null) {
+    return undefined;
+  }
+  const values = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",") : undefined;
+  if (!values) {
+    throw new Error(`${key} must be a string array.`);
+  }
+  return values.map((value) => (typeof value === "string" ? value.trim() : "")).filter(Boolean);
+}
+
+function resolveCanvasIdParam(params: Record<string, unknown>): string {
+  const raw =
+    readStringParam(params, "canvasId") ?? readStringParam(params, "canvasUrl", { required: true });
+  const trimmed = raw.trim();
+  const match =
+    trimmed.match(/\/docs\/[^/]+\/([A-Z0-9]+)/i) ?? trimmed.match(/\/files\/[^/]+\/([A-Z0-9]+)/i);
+  return match?.[1] ?? trimmed;
+}
+
+function readCanvasDocumentContent(params: Record<string, unknown>) {
+  const documentContent = readRecordParam(params, "documentContent");
+  if (documentContent) {
+    return documentContent;
+  }
+  const markdown = readStringParam(params, "markdown", { allowEmpty: true });
+  return markdown == null ? undefined : { type: "markdown", markdown };
+}
+
+function readCanvasChanges(params: Record<string, unknown>): Record<string, unknown>[] {
+  const changes = readRecordArrayParam(params, "changes");
+  if (changes) {
+    return changes;
+  }
+  const operation = readStringParam(params, "operation", { required: true });
+  const sectionId = readStringParam(params, "sectionId");
+  const change: Record<string, unknown> = {
+    operation,
+    ...(sectionId ? { section_id: sectionId } : {}),
+  };
+  if (operation === "rename") {
+    const titleContent = readRecordParam(params, "titleContent");
+    const title = readStringParam(params, "title");
+    if (!titleContent && !title) {
+      throw new Error("Canvas rename requires titleContent or title.");
+    }
+    change.title_content = titleContent ?? { type: "markdown", markdown: title };
+    return [change];
+  }
+  if (operation !== "delete") {
+    const documentContent = readCanvasDocumentContent(params);
+    if (!documentContent) {
+      throw new Error("Canvas edit requires changes or markdown/documentContent.");
+    }
+    change.document_content = documentContent;
+  }
+  return [change];
+}
+
+function readCanvasAccessTargets(params: Record<string, unknown>) {
+  const channelId = readStringParam(params, "channelId");
+  const channelIdsRaw =
+    readStringArrayParam(params, "channelIds") ?? (channelId ? [channelId] : undefined);
+  const channelIds = channelIdsRaw?.map((id) => resolveSlackChannelId(id));
+  const userId = readStringParam(params, "userId");
+  const userIds = readStringArrayParam(params, "userIds") ?? (userId ? [userId] : undefined);
+  if (channelIds?.length && userIds?.length) {
+    throw new Error("Canvas access actions accept channelIds or userIds, not both.");
+  }
+  if (!channelIds?.length && !userIds?.length) {
+    throw new Error("Canvas access actions require channelIds or userIds.");
+  }
+  return { channelIds, userIds };
 }
 
 export async function handleSlackAction(
@@ -468,6 +608,70 @@ export async function handleSlackAction(
       return message ? Object.assign({}, pin, { message }) : pin;
     });
     return jsonResult({ ok: true, pins: normalizedPins });
+  }
+
+  if (canvasActions.has(action)) {
+    if (!isActionEnabled("canvases")) {
+      throw new Error("Slack canvases are disabled.");
+    }
+    switch (action) {
+      case "createCanvas": {
+        const title = readStringParam(params, "title");
+        const documentContent = readCanvasDocumentContent(params);
+        const channelIdRaw = readStringParam(params, "channelId");
+        const channelId = channelIdRaw ? resolveSlackChannelId(channelIdRaw) : undefined;
+        const result = await slackActionRuntime.createSlackCanvas({
+          ...writeOpts,
+          title: title ?? undefined,
+          documentContent,
+          channelId,
+        });
+        return jsonResult({ ok: true, result });
+      }
+      case "editCanvas": {
+        const canvasId = resolveCanvasIdParam(params);
+        const changes = readCanvasChanges(params);
+        const result = await slackActionRuntime.editSlackCanvas(canvasId, changes, writeOpts);
+        return jsonResult({ ok: true, result });
+      }
+      case "lookupCanvasSections": {
+        const canvasId = resolveCanvasIdParam(params);
+        const criteria = readRecordParam(params, "criteria", { required: true })!;
+        const result = await slackActionRuntime.lookupSlackCanvasSections(
+          canvasId,
+          criteria,
+          readOpts,
+        );
+        return jsonResult({ ok: true, result });
+      }
+      case "setCanvasAccess": {
+        const canvasId = resolveCanvasIdParam(params);
+        const accessLevel = readStringParam(params, "accessLevel", { required: true });
+        if (accessLevel !== "read" && accessLevel !== "write" && accessLevel !== "owner") {
+          throw new Error("Canvas accessLevel must be read, write, or owner.");
+        }
+        const targets = readCanvasAccessTargets(params);
+        if (accessLevel === "owner" && targets.channelIds?.length) {
+          throw new Error("Canvas owner access can only be granted to userIds.");
+        }
+        const result = await slackActionRuntime.setSlackCanvasAccess(canvasId, accessLevel, {
+          ...writeOpts,
+          ...targets,
+        });
+        return jsonResult({ ok: true, result });
+      }
+      case "deleteCanvasAccess": {
+        const canvasId = resolveCanvasIdParam(params);
+        const targets = readCanvasAccessTargets(params);
+        const result = await slackActionRuntime.deleteSlackCanvasAccess(canvasId, {
+          ...writeOpts,
+          ...targets,
+        });
+        return jsonResult({ ok: true, result });
+      }
+      default:
+        break;
+    }
   }
 
   if (action === "memberInfo") {

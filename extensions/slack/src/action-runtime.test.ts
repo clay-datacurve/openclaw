@@ -4,13 +4,17 @@ import { handleSlackAction, slackActionRuntime } from "./action-runtime.js";
 import { parseSlackBlocksInput } from "./blocks-input.js";
 
 const originalSlackActionRuntime = { ...slackActionRuntime };
+const createSlackCanvas = vi.fn(async (..._args: unknown[]) => ({ canvas_id: "F123" }));
+const deleteSlackCanvasAccess = vi.fn(async (..._args: unknown[]) => ({}));
 const deleteSlackMessage = vi.fn(async (..._args: unknown[]) => ({}));
 const downloadSlackFile = vi.fn(async (..._args: unknown[]): Promise<unknown> => null);
+const editSlackCanvas = vi.fn(async (..._args: unknown[]) => ({}));
 const editSlackMessage = vi.fn(async (..._args: unknown[]) => ({}));
 const getSlackMemberInfo = vi.fn(async (..._args: unknown[]) => ({}));
 const listSlackEmojis = vi.fn(async (..._args: unknown[]) => ({}));
 const listSlackPins = vi.fn(async (..._args: unknown[]) => ({}));
 const listSlackReactions = vi.fn(async (..._args: unknown[]) => ({}));
+const lookupSlackCanvasSections = vi.fn(async (..._args: unknown[]) => ({ sections: [] }));
 const pinSlackMessage = vi.fn(async (..._args: unknown[]) => ({}));
 const reactSlackMessage = vi.fn(async (..._args: unknown[]) => ({}));
 const readSlackMessages = vi.fn(async (..._args: unknown[]) => ({}));
@@ -18,6 +22,7 @@ const removeOwnSlackReactions = vi.fn(async (..._args: unknown[]) => ["thumbsup"
 const removeSlackReaction = vi.fn(async (..._args: unknown[]) => ({}));
 const recordSlackThreadParticipation = vi.fn();
 const sendSlackMessage = vi.fn(async (..._args: unknown[]) => ({ channelId: "C123" }));
+const setSlackCanvasAccess = vi.fn(async (..._args: unknown[]) => ({}));
 const unpinSlackMessage = vi.fn(async (..._args: unknown[]) => ({}));
 
 describe("handleSlackAction", () => {
@@ -92,13 +97,17 @@ describe("handleSlackAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.assign(slackActionRuntime, originalSlackActionRuntime, {
+      createSlackCanvas,
+      deleteSlackCanvasAccess,
       deleteSlackMessage,
       downloadSlackFile,
+      editSlackCanvas,
       editSlackMessage,
       getSlackMemberInfo,
       listSlackEmojis,
       listSlackPins,
       listSlackReactions,
+      lookupSlackCanvasSections,
       parseSlackBlocksInput,
       pinSlackMessage,
       reactSlackMessage,
@@ -107,6 +116,7 @@ describe("handleSlackAction", () => {
       removeOwnSlackReactions,
       removeSlackReaction,
       sendSlackMessage,
+      setSlackCanvasAccess,
       unpinSlackMessage,
     });
   });
@@ -743,6 +753,75 @@ describe("handleSlackAction", () => {
       },
     } as OpenClawConfig);
     expect(token).toBe("xoxp-user");
+  });
+
+  it("creates a canvas with markdown content", async () => {
+    await handleSlackAction(
+      { action: "createCanvas", title: "Plan", markdown: "# Plan", channelId: "channel:C123" },
+      slackConfig(),
+    );
+
+    expect(createSlackCanvas).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cfg: expect.any(Object),
+        title: "Plan",
+        documentContent: { type: "markdown", markdown: "# Plan" },
+        channelId: "C123",
+      }),
+    );
+  });
+
+  it("edits a canvas from a Slack docs URL", async () => {
+    await handleSlackAction(
+      {
+        action: "editCanvas",
+        canvasUrl: "https://datacurve.slack.com/docs/T06RJLSHDGE/F0A5UJZ1W3D",
+        operation: "insert_at_end",
+        markdown: "update",
+      },
+      slackConfig(),
+    );
+
+    expect(editSlackCanvas).toHaveBeenCalledWith(
+      "F0A5UJZ1W3D",
+      [
+        {
+          operation: "insert_at_end",
+          document_content: { type: "markdown", markdown: "update" },
+        },
+      ],
+      expect.objectContaining({ cfg: expect.any(Object) }),
+    );
+  });
+
+  it("sets canvas access for users", async () => {
+    await handleSlackAction(
+      { action: "setCanvasAccess", canvasId: "F123", accessLevel: "write", userIds: ["U1"] },
+      slackConfig(),
+    );
+
+    expect(setSlackCanvasAccess).toHaveBeenCalledWith(
+      "F123",
+      "write",
+      expect.objectContaining({ userIds: ["U1"] }),
+    );
+  });
+
+  it("looks up canvas sections", async () => {
+    await handleSlackAction(
+      {
+        action: "lookupCanvasSections",
+        canvasId: "F123",
+        criteria: { section_types: ["any_header"], contains_text: "Plan" },
+      },
+      slackConfig(),
+    );
+
+    expect(lookupSlackCanvasSections).toHaveBeenCalledWith(
+      "F123",
+      { section_types: ["any_header"], contains_text: "Plan" },
+      expect.objectContaining({ cfg: expect.any(Object) }),
+    );
   });
 
   it("returns all emojis when no limit is provided", async () => {

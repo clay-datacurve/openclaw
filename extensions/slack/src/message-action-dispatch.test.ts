@@ -175,4 +175,32 @@ describe("handleSlackMessageAction", () => {
       expect.any(Object),
     );
   });
+
+  it("maps canvas message-tool actions to Slack Canvas runtime actions", async () => {
+    const invoke = createInvokeSpy();
+
+    await handleSlackMessageAction({
+      providerId: "slack",
+      ctx: {
+        action: "canvas-edit",
+        cfg: {},
+        params: {
+          canvasUrl: "https://datacurve.slack.com/docs/T06RJLSHDGE/F0A5UJZ1W3D",
+          operation: "insert_at_end",
+          markdown: "update",
+        },
+      } as never,
+      invoke: invoke as never,
+    });
+
+    expect(invoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "editCanvas",
+        canvasUrl: "https://datacurve.slack.com/docs/T06RJLSHDGE/F0A5UJZ1W3D",
+        operation: "insert_at_end",
+        markdown: "update",
+      }),
+      expect.any(Object),
+    );
+  });
 });
